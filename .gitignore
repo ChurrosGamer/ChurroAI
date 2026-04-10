@@ -1,0 +1,10 @@
+node_modules/
+.env
+videos/*
+!videos/.gitkeep
+logs.txt
+sessionLogs/**
+!sessionLogs/**/.gitkeep
+config.json
+apikeys.txt
+apikeys_exhausted.txt
