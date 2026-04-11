@@ -2,6 +2,8 @@ const { EmbedBuilder } = require('discord.js');
 const config = require('../config.json');
 const queueRanks = Object.keys(config.queue_ranks);
 const queueRanksPositions = config.queue_ranks;
+const colours = config.colours;
+
 const { logError } = require('../utils/errorLogger.js');
 let queueRankStatus = {};
 for (const [index, value] of queueRanks.entries()) {
