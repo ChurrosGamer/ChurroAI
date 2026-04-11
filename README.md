@@ -108,6 +108,14 @@ In order for the bot to use them, you can do this by creating a file `apikeys.tx
 
 ![API Keys File](https://i.postimg.cc/wTFCfMkJ/image.png)
 
+## Configuring Commands
+
+To make the Discord bot's commands appear, ensure your terminal is in the bot folder and run:
+   ```bash
+   node deployment
+   ```
+   > **Note:** You only need to do this once. Run it again only if new commands are added or existing ones are modified. The commands will remain registered even if the bot goes offline.
+
 ## Running the Discord Bot
 
 Once all your files are configured and saved, ensure your terminal is in the bot folder and run:
