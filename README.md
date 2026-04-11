@@ -49,12 +49,10 @@ Before installing the bot, you need to set up your database. Follow the instruct
 2. **Download the bot and install dependencies.**
    Run the following commands in your terminal:
    ```bash
-   git clone https://github.com/DeterminedGeneral/Homework-Autocompleter.git .
+   git clone https://github.com/ChurrosGamer/ChurroAI .
    npm install
    ```
    > **Note:** The `.` at the end of the `git clone` command ensures the repository is cloned directly into your current folder, rather than creating a new subfolder.
-
-   ![Running Commands](https://i.postimg.cc/k53n36Wy/image.png)
 
 3. **Set up your environment variables and configuration.**
    Create two new files in your folder: `.env` and `config.json`. Fill them out using the provided `.example` files as a guide. 
@@ -90,7 +88,6 @@ You will need to gather several keys and IDs to fill out your `.env` file. Here 
 * **CLIENT_ID**: Discord Developer Portal -> **General Information** -> Copy **Application ID**.
 * **DISCORD_TOKEN**: Discord Developer Portal -> **Bot** -> Click **Reset Token**.
   ![Discord Token](https://i.postimg.cc/mrZnKTtV/image.png)
-* **GEMINI_API_KEY**: Generate an API key from [Google AI Studio](https://aistudio.google.com/api-keys).
 * **ADMIN_ROLE**: The Discord Role ID for bot administrators (see tip above).
 * **RESOURCE_WEBHOOK_URL** & **WEBHOOK_URL**: Go to your target Discord channel's **Settings** -> **Integrations** -> **Webhooks** and create/copy the Webhook URL.
   ![Webhook](https://i.postimg.cc/dt6r4CZX/image.png)
@@ -100,6 +97,16 @@ You will need to gather several keys and IDs to fill out your `.env` file. Here 
 * **SUPABASEKEY**: In Supabase, go to **Settings** -> **API Keys** and copy the `secret` key.
 
 ![Env Example](https://i.postimg.cc/DmV8j2dc/image.png)
+
+### Configuring the API Keys
+
+In order to use the AI Features of the bot, you must configure at least one Gemini API Key. You can generate a free API Key at [Google AI Studio](https://aistudio.google.com/api-keys). If you encounter any requests to verify your age, you can do this with a credit or debit card in your [Google account's settings](https://myaccount.google.com/birthday).
+
+![Gemini API Key](https://i.postimg.cc/8CgjZZ4b/image.png)
+
+In order for the bot to use them, you can do this by creating a file `apikeys.txt` in the bot folder and adding an API Key, with each API Key being on a new line.
+
+![API Keys File](https://i.postimg.cc/wTFCfMkJ/image.png)
 
 ## Running the Discord Bot
 

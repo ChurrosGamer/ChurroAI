@@ -2,7 +2,7 @@ const config = require('./config.json');
 const { GoogleGenAI, Type } = require("@google/genai");
 const { MessageFlags, ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } = require('discord.js');
 const IMAGE_SOLVER_CHANNEL_ID = config.image_solver;
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = null;
 
 async function aiAnswer(ai, image, model) {
 const response = await ai.models.generateContent({
@@ -180,6 +180,7 @@ async function imageSolver(image, message, message_sent, mode = 'flash') {
 }
 
 async function imageSolverHandler(message) {
+    return;
     // Ignore messages from other channels
     if (
         (Array.isArray(IMAGE_SOLVER_CHANNEL_ID) && !IMAGE_SOLVER_CHANNEL_ID.includes(message.channel.id)) ||

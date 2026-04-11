@@ -1,7 +1,6 @@
 require('dotenv').config();
-const { GoogleGenAI, Type } = require("@google/genai");
+const { Type } = require("@google/genai");
 const Image_Requesticator = require('./requesticator');
-const apiKey = process.env.GEMINI_API_KEY;
 
 function isUUID(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -10,7 +9,7 @@ function isUUID(str) {
 
 class geminiAnswers {
     constructor() {
-        this.ai = new GoogleGenAI({ apiKey: apiKey });
+        this.ai = null;
         this.requesticator = new Image_Requesticator();
     }
 
