@@ -51,6 +51,7 @@ Before installing the bot, you need to set up your database. Follow the instruct
    ```bash
    git clone https://github.com/ChurrosGamer/ChurroAI .
    npm install
+   npx playwright install
    ```
    > **Note:** The `.` at the end of the `git clone` command ensures the repository is cloned directly into your current folder, rather than creating a new subfolder.
 
