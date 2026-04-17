@@ -27,7 +27,7 @@ async function menu(userSession) {
                 const homeworkTask = userSession.assignments.items.find(item => item.id === userSession.selectedHomework);
                 const courseId = homeworkTask.spec.courseId;
                 userSession.loadFromObject({courseId, sectionIds: homeworkTask.spec.sectionIds, sectionStats: homeworkTask.sectionStats});
-                await autocompleteWrapper(componentInteraction, 'seneca', () => autocomplete(userSession));
+                await autocompleteWrapper(componentInteraction, 'seneca', userSession, () => autocomplete(userSession));
             } else if (componentInteraction.customId === 'save_account') {
                 const modal = new ModalBuilder()
                     .setCustomId(`save_account_seneca`)

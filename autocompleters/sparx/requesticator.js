@@ -1,5 +1,7 @@
 const Sparx_Requesticator = require('./requesticatorBasic.js');
 const {decode, encode} = require('./children/maths/sm_code.js');
+const getTokenSparx = require('./login.js');
+const getTokenRequest = require('./getTokenRequest.js');
 
 class SparxBase {
     /**
@@ -24,23 +26,106 @@ class SparxBase {
         this.curlRequests = new Sparx_Requesticator(authToken);
     }
 
-    async send(url, Uint8Array) {
-
+    async send(url, uint8Array, attempts = 3) {
         try {
+            this.log.logToFile(`Sending request to ${url}`);
+            const response = await this.curlRequests.sendRequest(url, uint8Array);
+            this.log.logToFile(`**Response returned**\nStatus: ${response.status}\n${JSON.stringify(response.headers, null, 2)}`);
 
-        this.log.logToFile(`Sending request to ${url}`);
-        const response = await this.curlRequests.sendRequest(url, Uint8Array);
-        this.log.logToFile(`**Response returned**\nStatus: ${response.status}\n${JSON.stringify(response.headers, null, 2)}`);
-        if (response.status == 401) {
-            const err = new Error("Unauthorized");
-            err.response = { status: 401 };
-            throw err;
-        }
+            // 1. Check for standard HTTP 401 Unauthorized
+            if (response.status == 401) {
+                const err = new Error("Unauthorized");
+                err.response = { status: 401 };
+                throw err;
+            }
 
-        return response;
+            const grpcStatus = response.headers['grpc-status'];
+            const grpcMessage = response.headers['grpc-message'];
 
-        } catch(err) {
-            throw new Error(err);
+            // 2. Handle gRPC Specific Statuses and Messages
+            if (grpcStatus) {
+                if (grpcStatus === '8') {
+                    return 8;
+                }
+
+                if (grpcStatus === '9' && grpcMessage === 'wrong question state for answer action') {
+                    return 9;
+                }
+
+                if (['16', '9', '7'].includes(grpcStatus)) {
+                    if (grpcMessage === 'TaskItemHidden') {
+                        this.log.logToFile('Item is hidden so just break');
+                        return 'break';
+                    }
+                    if (grpcMessage?.includes('PendingWAC')) {
+                        this.log.logToFile("Bookwork check caught");
+                        return null;
+                    } 
+                    if (grpcMessage?.includes('SessionInactive')) {
+                        this.log.logToFile("SESSION INACTIVE CAUGHT!");
+                        if (typeof this.getClientSession === 'function') {
+                            await this.getClientSession();
+                        }
+                        // Retry without decrementing attempts (from original logic)
+                        return await this.send(url, uint8Array, attempts); 
+                    }
+                }
+            }
+
+            // 3. Return successful response
+            return response;
+
+        } catch (err) {
+            // If we are out of attempts, throw the error immediately
+            if (attempts <= 1) {
+                throw err;
+            }
+
+            // Wait 5 seconds before retrying
+            await new Promise(res => setTimeout(res, 5000));
+            this.log.logToFile(err);
+
+            // 4. Handle 401 Re-authentication
+            if (err.response?.status === 401) {
+                this.log.logToFile("Caught 401 Unauthorized, handling it attempting relogin...");
+
+                let newAuthToken;
+                if (this.login?.school) {
+                    const newAuthTokenN = await getTokenSparx({
+                        school: this.login.school,
+                        username: this.login.username,
+                        password: this.login.password,
+                        type: this.login.type
+                    });
+                    if (newAuthTokenN?.cookies) {
+                        this.cookies = newAuthTokenN.cookies;
+                    }
+                    if (newAuthTokenN?.authToken) {
+                        newAuthToken = newAuthTokenN.authToken;
+                    }
+                } else {
+                    newAuthToken = await getTokenRequest(this.cookies);
+                    if (newAuthToken?.includes('Unauthorized')) {
+                        throw err; // Stop retrying if strictly unauthorized
+                    }
+                }
+
+                if (newAuthToken) {
+                    this.log.logToFile('The new authtoken has been successfully acquired!');
+                    this.authToken = newAuthToken;
+                    this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
+                    
+                    // Included from Method 1: refresh client session on new token
+                    if (typeof this.getClientSession === 'function') {
+                        await this.getClientSession();
+                    }
+                } else {
+                    this.log.logToFile('Unable to login after 401 status code');
+                }
+            }
+
+            // 5. Retry request (handles both 401s after re-auth, and generic network errors)
+            return await this.send(url, uint8Array, attempts - 1);
         }
     }
 

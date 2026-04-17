@@ -27,7 +27,7 @@ class userSession {
     }
 
     createMainMenu() {
-        return new TextDisplayBuilder().setContent(`### Seneca Homework Selection\nSelect one of the homeworks below and it will automatically be completed for you!\n\n**❓ What is Simulated Time?**\nSimulated Time is the amount of time the bot simulate completing for each question. This is **PER QUESTION**, not per homework. Recommended time is 60-90 Seconds per question.\n\n**⏰ Simulated Time**: ${this.settings.min}-${this.settings.max} Seconds Per Question`);
+        return new TextDisplayBuilder().setContent(`### Seneca Homework Selection\nSelect one of the homeworks below and it will automatically be completed for you!\n\n**❓ What is Simulated Time?**\nSimulated Time is the amount of time the bot simulate completing for each question. This is **PER QUESTION**, not per homework. Recommended time is 23-25 Seconds per question.\n\n**⏰ Simulated Time**: ${this.settings.min}-${this.settings.max} Seconds Per Question`);
     }
 
     async init() {
@@ -134,7 +134,6 @@ class userSessions extends base {
     }
 
     createNewSession(interaction, loginDetails, token) {
-        console.log(this.requesticator);
         this.sessions[interaction.user.id] = new userSession(interaction, loginDetails, new this.requesticator(token, loginDetails));
         return this.sessions[interaction.user.id];
     }

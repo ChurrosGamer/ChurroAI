@@ -1,6 +1,4 @@
 const { decode, encode } = require('./ss_code.js');
-const getTokenSparx = require('../../login.js');
-const getTokenRequest = require('../../getTokenRequest.js');
 const SparxBase = require('../../requesticator.js');
 
 class SparxScience extends SparxBase {
@@ -20,90 +18,8 @@ class SparxScience extends SparxBase {
             this.clientID = id;
             this.curlRequests.additionalHeaders = [`spx-app-version: ${id} (2026-02-11T12:49:29Z) science`];
             return id;
-            // Output: 042c97dc13fc71e51bb9b07e3b79df08732c90bc
         } else {
             return null;
-        }
-    }
-
-    async send(url, Uint8Array, attempts=3) {
-
-        try {
-
-        this.log.logToFile(`Sending request to ${url}`);
-        const response = await this.curlRequests.sendRequest(url, Uint8Array);
-        this.log.logToFile(`**Response returned**\nStatus: ${response.status}\n${JSON.stringify(response.headers, null, 2)}`);
-        if (response.status == 401) {
-            const err = new Error("Unauthorized");
-            err.response = { status: 401 };
-            throw err;
-        }
-
-        // console.log('Status:', response.status);
-
-        if (response.headers['grpc-status'] === '16') { // grpc-message: PendingWAC
-            const error = new Error(response.headers);
-            error.response = { status: 401 };
-            throw error;
-        }
-
-        if (response.headers['grpc-status'] === '9' && response.headers['grpc-message'] === 'wrong question state for answer action') {
-            return 9;
-        }
-
-        if (response.headers['grpc-status'] === '8') {
-            return 8;
-        }
-
-        // const hex = Buffer.from(response.data).toString('hex');
-        // console.log(`Raw Response (Hex): ${hex}`);
-
-        return response;
-
-        } catch(err) {
-            await new Promise(res => setTimeout(res, 5000));
-            this.log.logToFile(err);
-            if (err.response?.status === 401 && attempts > 1) {
-                this.log.logToFile("Caught 401 Unauthorized, handling it attempting relogin...");
-
-                let newAuthToken;
-                if (this.login?.school) {
-                    const newAuthTokenN = await getTokenSparx({
-                        school: this.login.school,
-                        username: this.login.username,
-                        password: this.login.password,
-                        type: this.login.type
-                    });
-                    if (newAuthTokenN?.cookies) {
-                        this.cookies = newAuthTokenN.cookies;
-                    }
-                    if (newAuthTokenN?.authToken) {
-                        newAuthToken = newAuthTokenN.authToken;
-                    }
-                } else {
-                    newAuthToken = await getTokenRequest(this.cookies);
-                    if (newAuthToken.includes('Unauthorized')) {
-                        throw new Error(err);
-                    }
-                }
-
-                if (newAuthToken) {
-                    this.log.logToFile("The new authtoken has been successfully acquired!");
-                    this.authToken = newAuthToken;
-                    this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
-                } else {
-                    this.log.logToFile('Unable to login after 401 status code');
-                }
-
-                return (await this.send(url, Uint8Array, attempts - 1));
-                // handle refresh token, re-auth, etc.
-
-            }
-            else if (attempts > 1) {
-                return await (this.send(url, Uint8Array, attempts-1));
-            } else {
-                throw new Error(err);
-            }
         }
     }
 

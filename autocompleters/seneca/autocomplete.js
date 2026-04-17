@@ -4,9 +4,14 @@ const progressTracker = require('../../utils/progressTracker');
 const { emojis, colours } = require('../../config.json');
 const getProgressBar = require('../../utils/getProgressBar');
 const formatTime = require('../../utils/formatTime');
+const logger = require('../../utils/logger.js');
 
 async function autocomplete(userSession) {
+    const log = new logger(userSession.interaction.user.id, 'seneca');
+    log.logToFile('Logging Start');
     const settings = userSession.settings;
+    log.logToFile('Settings', settings);
+
     const cancel = new ButtonBuilder()
         .setCustomId('cancel')
         .setLabel('Cancel')
@@ -73,9 +78,6 @@ async function autocomplete(userSession) {
         for (let i = 0; i < 5; i++) {
             const timeTaken = Math.floor(Math.random() * (settings.max - settings.min + 1)) + settings.min;
             timeQuestions.push(timeTaken);
-            if (i === 1 || i === 2 || i === 4) {
-                fakeTime += timeTaken;
-            }
         }
 
         const generator = new DynamicSessionGenerator(taskInfo);
@@ -85,6 +87,12 @@ async function autocomplete(userSession) {
             sessionId: userSession.requesticator.sessionId,
             durations: timeQuestions
         });
+
+        const start = new Date(answerData.session.timeStarted);
+        const finish = new Date(answerData.session.timeFinished);
+        fakeTime += Math.floor((finish - start) / 1000);
+
+        log.logToFile('Answer Data', JSON.stringify(answerData, null, 2));
         // console.log('Answer data', answerData);
         await userSession.requesticator.post('https://session.app.senecalearning.com/api/session', answerData);
 
@@ -99,6 +107,7 @@ async function autocomplete(userSession) {
     }
 
     await progressUpdater.end();
+    await log.send(userSession.interaction.user);
     return progressUpdater.totalSeconds;
 }
 

@@ -1,7 +1,6 @@
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, MessageFlags, AttachmentBuilder, ContainerBuilder, FileBuilder, TextDisplayBuilder } = require('discord.js');
 const fs = require('fs').promises;
 const { emojis, colours } = require('../../../../config.json');
-const { parser, parseBookwork, parseBookworkData, parseQuestion } = require('./parser');
 const { getBookworks, addToDbBookwork } = require('../../../../database/bookwork.js');
 const { appendToDB, getFromDB, updateDB } = require('../../../../database/general.js');
 const { getBookworkCheckAnswer } = require('./bookwork.js');
@@ -16,6 +15,8 @@ const userAutocompleters = {};
 const convertAItoObject = require('../../../../utils/convertAItoObject.js');
 const { checkAccount } = require('../../../../database/accounts.js');
 const isHigherModel = require('../../../../utils/isHighestModel.js');
+const makeGroupArray = require('../../../../utils/makeGroupArray.js');
+const SparxQuestionParser = require('./parser');
 
 function stripWorkingOut(obj) {
     const result = {};
@@ -283,18 +284,33 @@ async function checkDB(question, activityIndex, questionIndex, interaction) {
     return answerObject;
 }
 
+function addGroup(task) {
+    let progressEntry = {
+        name: task.title
+    };
+    if (task.title.endsWith('Times Tables')) {
+        progressEntry.value = getProgressBar(task.completion.progress.C, task.completion.size);
+    } else {
+        progressEntry.value = getProgressBar(task.numTaskItemsDone, task.numTaskItems);
+    }
+
+    return progressEntry;
+}
+
 async function sparxMathsAutocomplete(userSession) {
     const settings = userSession.settings;
     const interaction = userSession.interaction;
     const sparxMaths = userSession.requesticator;
     const packageID = userSession.selectedHomework;
-    const apikey = (await checkAccount(interaction.user.id)).apikeys;
+    const apikeys = (await checkAccount(interaction.user.id)).apikeys;
     const ai = convertAItoObject(userSession.settings.model);
     const log = new logger(userSession.interaction.user.id, 'sparx_maths');
     sparxMaths.log = log;
     log.logToFile('Logging Start');
     log.logToFile(`**Settings**\nFaketime Min: ${settings.min}\nFaktime Max: ${settings.max}\nPDF Settings: ${JSON.stringify(settings.pdfSettings, null, 2)}`);
     const queueMaths = require('./queue.js');
+
+    const parser = new SparxQuestionParser(interaction, apikeys);
 
     const taskTimer = process.hrtime();
 
@@ -320,33 +336,12 @@ async function sparxMathsAutocomplete(userSession) {
     let errorOccured = false;
 
     const tasks = await sparxMaths.getTasks(packageID);
-    const sectionsProgress = [];
-    let currentGroup = [];
-    for (const task of tasks.tasks) {
-        let progressEntry = {
-            name: task.title
-        };
-        if (task.title.endsWith('Times Tables')) {
-            progressEntry.value = await getProgressBar(task.completion.progress.C, task.completion.size);
-        } else {
-            progressEntry.value = await getProgressBar(task.numTaskItemsDone, task.numTaskItems);
-        }
 
-        // Push into current group
-        currentGroup.push(progressEntry);
-
-        // If group reaches 5, push it to the main array and start new group
-        if (currentGroup.length === 5) {
-            sectionsProgress.push(currentGroup);
-            currentGroup = [];
-        }
-    }
-
-    if (currentGroup.length > 0) {
-        sectionsProgress.push(currentGroup);
-    }
-
-    // updateEmbederExecuter = new updateEmbeder(sparxMaths, packageID, new EmbedBuilder(anotherEmbed), targetMessage, row, queueMaths, interaction, taskTimer);
+    const sectionsProgress = await makeGroupArray(
+        tasks.tasks,
+        addGroup,
+        5
+    );
 
     const getTimeField = function () {
         return `> **Time Spent**: ${formatTime((process.hrtime(taskTimer))[0])}\n> **Time Simulated**: ${formatTime(sparxMathsExecuter.totalFakeTime)}`;
@@ -370,7 +365,6 @@ async function sparxMathsAutocomplete(userSession) {
                 let activityIndex = await sparxMathsExecuter.startTimesTable(packageID, task.taskIndex);
                 for (let i = 0; i < 50; i++) {
                     await sparxMathsExecuter.answerTimesTable(activityIndex);
-                    // activityIndex++;
                 }
                 await progressUpdater.updateProgressBar(task.taskIndex - 1, 1, 1);
                 continue;
@@ -402,10 +396,10 @@ async function sparxMathsAutocomplete(userSession) {
 
                         const bookmarks = stripWorkingOut(JSON.parse((await getBookworks(packageID)).bookworks));
 
-                        const bookmarksCorrectAnswer = await parseBookworkData(bookworkInitialData.payload.wac, bookmarks);
+                        const bookmarksCorrectAnswer = await parser.parseBookworkData(bookworkInitialData.payload.wac, bookmarks);
                         if (bookmarksCorrectAnswer) { // bookmarksCorrectAnswer
                             log.logToFile(bookmarksCorrectAnswer);
-                            const bookworkAnswer = parseBookwork(activityIndex, bookmarksCorrectAnswer, interaction);
+                            const bookworkAnswer = parser.parseBookwork(activityIndex, bookmarksCorrectAnswer);
                             await sparxMathsExecuter.readyBookwork(activityIndex);
                             log.logToFile('!!!');
                             log.logToFile(bookworkAnswer);
@@ -426,7 +420,7 @@ async function sparxMathsAutocomplete(userSession) {
                             counterComplete++;
                         }
 
-                        const bookworkAnswer = parseBookwork(activityIndex, commonAnswersPrevious[0], interaction);
+                        const bookworkAnswer = parser.parseBookwork(activityIndex, commonAnswersPrevious[0]);
                         await sparxMathsExecuter.readyBookwork(activityIndex);
                         await sparxMathsExecuter.answerQuestion(bookworkAnswer, sparxMathsExecuter);
 
@@ -450,23 +444,14 @@ async function sparxMathsAutocomplete(userSession) {
                 }
                 sparxMathsExecuter.currentBookmark = item.payload.question.bookworkCode;
 
-                /*
-                if (taskItems[index-1].status !== 1) {
-                    sparxMathsExecuter.currentBookmark = item.payload.question.bookworkCode;
-                    await sparxMathsExecuter.questionCompleter(item, index);
-                }
-                */
-
-                // await sparxMathsExecuter.questionCompleter(item, index); question.bookworkCode
-
                 async function attemptQuestion(attempts = 1) {
                     if (await shouldStop()) return 'break';
-                    const item = await sparxMaths.getActivity(sparxMathsExecuter.getTimestamp(), packageID, task.taskIndex, index); // NEED TO GET ACTIVITY INDEX RIGHT, same as questionIndex I think. or its actually the increment by one
+                    const item = await sparxMaths.getActivity(sparxMathsExecuter.getTimestamp(), packageID, task.taskIndex, index);
                     if (item === 'break') return 'break';
                     if (await completeBookwork(item)) return 'continue';
                     let model = ai[attempts-1];
                     if (!model && attempts > 1) return 'blank';
-                    const activityIndex = item.activityIndex; // Fuck everything I said on the previous comment, I have no clue
+                    const activityIndex = item.activityIndex;
                     const questionIndex = item.payload.question.questionIndex;
                     const questionLayout = JSON.parse(item.payload.question.questionSpec);
 
@@ -514,7 +499,7 @@ async function sparxMathsAutocomplete(userSession) {
                         alreadyInDB = false;
                         log.logToFile('Using AI Model', model);
                         questionObjectSend = await getAIanswer(
-                            () => parser(apikey, questionLayout[0], activityIndex, questionIndex, model, interaction, failedQuestion?.incorrect_answers),
+                            () => parser.parse(questionLayout[0], activityIndex, questionIndex, model, failedQuestion?.incorrect_answers),
                             queueMaths,
                             interaction,
                             progressUpdater,
@@ -532,7 +517,7 @@ async function sparxMathsAutocomplete(userSession) {
 
                     log.logToFile(questionObjectSend?.action?.question?.answer?.components, 'Working out', workingOut); // addWorkingOut
 
-                    const questionSuccess = await sparxMathsExecuter.answerQuestion(questionObjectSend, sparxMathsExecuter, workingOut, parseQuestion(questionLayout[0]));
+                    const questionSuccess = await sparxMathsExecuter.answerQuestion(questionObjectSend, sparxMathsExecuter, workingOut, parser.parseQuestion(questionLayout[0]));
                     if (questionSuccess) task.numTaskItemsDone++;
                     await progressUpdater.updateProgressBar(task.taskIndex - 1, task.numTaskItemsDone, task.numTaskItems);
                     if (questionSuccess && !alreadyInDB) {

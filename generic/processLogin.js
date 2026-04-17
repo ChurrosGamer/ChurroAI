@@ -51,7 +51,7 @@ async function processLogin(interaction, platform, login, getTokenRequest, userS
     }
 
     const Loadingcontainer = new ContainerBuilder()
-        .setAccentColor(colours.blue)
+        .setAccentColor(colours.onyx)
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(`### Logging In... :hourglass:\nAttempting to log in to your account...`)
         );

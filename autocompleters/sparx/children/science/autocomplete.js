@@ -1,7 +1,7 @@
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const { emojis, colours } = require('../../../../config.json');
 const fakeTimeSetting = {};
-const { parser, getQuestionObject } = require('./parser');
+const SparxParser = require('./parser.js');
 const { appendToDB, updateDB, getFromDB, deleteEntryDB } = require('../../../../database/general.js');
 const { logError } = require('../../../../utils/errorLogger.js');
 const progressTracker = require('../../../../utils/progressTracker.js');
@@ -36,7 +36,7 @@ async function sparxScienceAutocomplete(userSession) {
     const interaction = userSession.interaction;
     const sparxScience = userSession.requesticator;
     const packageID = userSession.selectedHomework;
-    const apikey = (await checkAccount(interaction.user.id)).apikeys;
+    const apikeys = (await checkAccount(interaction.user.id)).apikeys;
     const ai = convertAItoObject(userSession.settings.model);
     const log = new logger(userSession.interaction.user.id, 'sparx_science');
     sparxScience.log = log;
@@ -45,6 +45,7 @@ async function sparxScienceAutocomplete(userSession) {
     fakeTimeSetting[interaction.user.id] = { min: settings.min, max: settings.max, total: 0 };
 
     const queueScience = require('./queue.js');
+    const parser = new SparxParser(apikeys);
 
     const taskTimer = process.hrtime();
 
@@ -207,7 +208,7 @@ async function sparxScienceAutocomplete(userSession) {
                         log.logToFile('Trying to run AI Model', aiModel);
 
                         aiAnswered = await getAIanswer(
-                            () => parser(apikey, questionLayout[questionLayout.length - 1], aiModel, activityName, token, supportMaterial, failedQuestion?.incorrect_answers),
+                            () => parser.parse(questionLayout[questionLayout.length - 1], aiModel, activityName, token, supportMaterial, failedQuestion?.incorrect_answers),
                             queueScience,
                             interaction,
                             progressUpdater,
@@ -221,7 +222,7 @@ async function sparxScienceAutocomplete(userSession) {
 
                     } else {
                         alreadyInDB = true;
-                        aiAnswered = getQuestionObject(JSON.parse(aiAnswered), activityName, token);
+                        aiAnswered = parser.getQuestionObject(JSON.parse(aiAnswered), activityName, token);
                         log.logToFile("DB Answer:");
                         log.logToFile(aiAnswered.action.answer.components);
                     }

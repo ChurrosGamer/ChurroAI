@@ -1,7 +1,4 @@
 const { decode, encode } = require('./sr_code.js');
-// const { getTokenSparx, getTokenRequest } = require('./puppeteer.js');
-const getTokenSparx = require('../../login.js');
-const getTokenRequest = require('../../getTokenRequest.js');
 const { answerQuestionAi } = require('../../../../gemini/sparx_reader/main.js');
 const { addToDb, checkAnswer } = require('../../../../database/reader.js');
 const getApiKeys = require('../../../../utils/getApiKeys.js');
@@ -11,87 +8,6 @@ const SparxBase = require('../../requesticator.js');
 class SparxReader extends SparxBase {
     constructor(authToken, login={}, cookies) {
         super(authToken, login, cookies, decode, encode);
-    }
-
-    async send(url, Uint8Array, attempts=3) {
-
-        try {
-
-        this.log.logToFile(`Sending request to ${url}`);
-        const response = await this.curlRequests.sendRequest(url, Uint8Array);
-        this.log.logToFile(`**Response returned**\nStatus: ${response.status}\n${JSON.stringify(response.headers, null, 2)}`);
-        if (response.status == 401) {
-            const err = new Error("Unauthorized");
-            err.response = { status: 401 };
-            throw err;
-        }
-
-        /*
-        const body = Buffer.from(Uint8Array);
-        const bodyHex = body.toString("hex");
-        const response = await axios.post(url, body, {
-        headers,
-        responseType: 'arraybuffer'
-        });
-        */
-
-        // console.log('Status:', response.status);
-        // console.log('Headers:', response.headers);
-
-        if (response.headers['grpc-status'] === '8') {
-            return 8;
-        }
-
-        // const hex = Buffer.from(response.data).toString('hex');
-        // console.log(`Raw Response (Hex): ${hex}`);
-
-        return response;
-
-        } catch(err) {
-            await new Promise(res => setTimeout(res, 5000));
-            this.log.logToFile(err);
-            if (err.response?.status === 401 && attempts > 1) {
-                this.log.logToFile("Caught 401 Unauthorized, handling it attempting relogin...");
-
-                let newAuthToken;
-                if (this.login?.school) {
-                    const newAuthTokenN = await getTokenSparx({
-                        school: this.login.school,
-                        username: this.login.username,
-                        password: this.login.password,
-                        type: this.login.type
-                    });
-                    if (newAuthTokenN?.cookies) {
-                        this.cookies = newAuthTokenN.cookies;
-                    }
-                    if (newAuthTokenN?.authToken) {
-                        newAuthToken = newAuthTokenN.authToken;
-                    }
-                } else {
-                    newAuthToken = await getTokenRequest(this.cookies);
-                    if (newAuthToken.includes('Unauthorized')) {
-                        throw new Error(err);
-                    }
-                }
-
-                if (newAuthToken) {
-                    this.log.logToFile("The new authtoken has been successfully acquired!");
-                    this.authToken = newAuthToken;
-                    this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
-                } else {
-                    this.log.logToFile("Unable to login after 401 status code");
-                }
-                
-                return (await this.send(url, Uint8Array, attempts - 1));
-                // handle refresh token, re-auth, etc.
-
-            }
-            else if (attempts > 1) {
-                return await (this.send(url, Uint8Array, attempts-1));
-            } else {
-                throw new Error(err);
-            }
-        }
     }
 
     async startSwappedBook(bookObj) {
@@ -171,28 +87,7 @@ class SparxReader extends SparxBase {
             }
         }
 
-        // console.log(activeBooks);
         return activeBooks;
-
-
-
-        // Convert to JSON string
-        /*
-        const jsonData = JSON.stringify(libraryBooks, null, 2); // pretty print with 2-space indentation
-        console.log(jsonData);
-        const filePath = path.resolve(__dirname, '../data.json'); // or './data.json' to write to current folder
-
-        // Write to file
-        fs.writeFile(filePath, jsonData, (err) => {
-        if (err) {
-            console.error('Error writing file', err);
-        } else {
-            console.log('JSON data written to file successfully');
-        }
-        });
-        */
-
-
     }
 
     async getGoldReaderState() {
