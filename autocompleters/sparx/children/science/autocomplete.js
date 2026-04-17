@@ -197,6 +197,7 @@ async function sparxScienceAutocomplete(userSession) {
                         }
                     }
 
+                    log.logToFile('Should try', shouldTry);
                     if (!shouldTry) {
                         break;
                     }
@@ -230,6 +231,7 @@ async function sparxScienceAutocomplete(userSession) {
                     }
 
                     let errorCode = await sparxScienceExecuter.answerQuestion(aiAnswered);
+                    log.logToFile('Question response after AI Answered', errorCode);
                     if (errorCode === 9) {
                         const readyResponse = await sparxScienceExecuter.readyQuestion(activityName, token);
                         if (readyResponse) {
@@ -258,6 +260,7 @@ async function sparxScienceAutocomplete(userSession) {
                         questionSuccecceed = errorCode.packageUpdate.contents.tasks[task.taskIndex].contents.skillsTask.taskItems[index - 1].state.status === 1;
                         if (questionSuccecceed) tasksScores[task.taskIndex].totalCorrect += 1;
                     }
+                    log.logToFile('Question Succedded', questionSuccecceed);
                     if (errorCode.activity.state.skillActivity.question?.supportMaterial) {
                         supportMaterial = errorCode.activity.state.skillActivity.question.supportMaterial?.text;
                     }
@@ -282,11 +285,13 @@ async function sparxScienceAutocomplete(userSession) {
                         timesIncorrect = 0;
                         aiModel = ai[0];
                     } else {
+                        log.logToFile('Failed question after question succedded wrong', failedQuestion);
                         if (!failedQuestion) {
                             await appendToDB('sparx_science_failed', {question: JSON.stringify(questionLayout), incorrect_answers: [aiAnswered.action.answer.components], ai_model: aiModel});
                         } else {
                             failedQuestion.incorrect_answers.push(aiAnswered.action.answer.components);
-                            await updateDB('sparx_science_failed', {incorrect_answers: failedQuestion.incorrect_answers }, 'question', questionLayout);
+                            log.logToFile('Failed questions updated: ', failedQuestion.incorrect_answers);
+                            await updateDB('sparx_science_failed', {incorrect_answers: failedQuestion.incorrect_answers, ai_model: aiModel }, 'question', questionLayout);
                         }
                         timesIncorrect += 1;
                         aiModel = ai[1];

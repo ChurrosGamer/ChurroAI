@@ -47,7 +47,7 @@ class geminiAnswers {
 
         // add incorrect answers to the question
         if (incorrect_answers) {
-            totalText += `NOTE: Another AI Model tried to answer the question and these were its INCORRECT answers:`;
+            totalText += `NOTE: Another AI Model tried to answer the question and these were its INCORRECT answers (THESE ARE INCORRECT 100%, DO NOT ARGUE OR PUT THESE AGAIN).`;
             for (const answer of incorrect_answers) {
                 totalText += `\n - ${answer}`;
             }

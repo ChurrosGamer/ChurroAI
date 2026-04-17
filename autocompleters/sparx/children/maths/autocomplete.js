@@ -547,7 +547,7 @@ async function sparxMathsAutocomplete(userSession) {
                             await appendToDB('sparx_maths_failed', {question: JSON.stringify(item.payload.question.questionSpec), incorrect_answers: [questionObjectSend.action.question.answer.components], ai_model: model});
                         } else {
                             failedQuestion.incorrect_answers.push(questionObjectSend.action.question.answer.components);
-                            await updateDB('sparx_maths_failed', {incorrect_answers: failedQuestion.incorrect_answers}, 'question', item.payload.question.questionSpec);
+                            await updateDB('sparx_maths_failed', {incorrect_answers: failedQuestion.incorrect_answers, ai_model: model }, 'question', item.payload.question.questionSpec);
                         }
                         if (attempts < 3) {
                             if (attempts === 1) {
