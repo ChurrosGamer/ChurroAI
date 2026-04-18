@@ -123,7 +123,7 @@ class sparxReaderAutocompleter {
     }
 
     async getAnswer(id, extract, questionObj) {
-        const result = await checkAnswer(id);
+        const result = await checkAnswer(id, questionObj);
         const apikeys = await getApiKeys(this.apikeys);
         if (typeof(result) === "string") {
             return result;
@@ -145,7 +145,7 @@ class sparxReaderAutocompleter {
     }
 
   async maintainActive() {
-    await this.requesticator.sendUserActive();
+    await this.requesticator.sendUserActive('/task');
 
     setInterval(() => {
       if (this.cancelActive) return;

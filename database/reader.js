@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const { updateDB, appendToDB } = require('./general');
 
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
@@ -37,8 +38,7 @@ async function addToDb(id, correct_answer, incorrect_answers=[]) {
     }
 }
 
-
-async function checkAnswer(id) {
+async function checkAnswer(id, questionObj) {
     const { data } = await supabase
         .from('sparx_reader')
         .select('*')
@@ -46,15 +46,23 @@ async function checkAnswer(id) {
         .maybeSingle()
         .throwOnError();
 
+    if (questionObj?.questionText && questionObj?.questionOptions && (!data?.text || !data?.options)) {
+        if (data) {
+            await updateDB('sparx_reader', {text: questionObj.questionText, options: questionObj.questionOptions}, 'id', id);
+        } else {
+            await appendToDB('sparx_reader', {id, text: questionObj.questionText, options: questionObj.questionOptions});
+        }
+    }
+    
     if (data) {
         if (data.correct_answer) {
             return data.correct_answer;
-        } else {
+        } else if (data.incorrect_answers.length) {
             return data.incorrect_answers;
         }
-    } else {
-        return null;
-    }
+    } 
+        
+    return null;
 }
 
 module.exports = { addToDb, checkAnswer};
