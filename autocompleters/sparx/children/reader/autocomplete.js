@@ -206,7 +206,7 @@ async function autocomplete(userSession) {
     };
     const progressUpdater = new progressTracker(userSession.interaction, getTimeField);
     if (await progressUpdater.start(initialEmbed, row, sectionsProgress)) return;
-    await sparxReaderExecuter.maintainActive();
+    sparxReaderExecuter.maintainActive();
     const shouldStop = async () => !((pointsAcquired < settings.srp || readUntilFinish) && timesO < 10 && !progressUpdater.cancelled && (await queue.stillUsing(userSession.interaction.user.id)));
 
     try {
