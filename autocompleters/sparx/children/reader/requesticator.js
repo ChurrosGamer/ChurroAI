@@ -1,8 +1,4 @@
 const { decode, encode } = require('./sr_code.js');
-const { answerQuestionAi } = require('../../../../gemini/sparx_reader/main.js');
-const { addToDb, checkAnswer } = require('../../../../database/reader.js');
-const getApiKeys = require('../../../../utils/getApiKeys.js');
-const addApiKeyExhausted = require('../../../../utils/addApiKeyExhausted.js');
 const SparxBase = require('../../requesticator.js');
 
 class SparxReader extends SparxBase {

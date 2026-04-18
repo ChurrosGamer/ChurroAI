@@ -52,6 +52,7 @@ Before installing the bot, you need to set up your database. Follow the instruct
    git clone https://github.com/ChurrosGamer/ChurroAI .
    npm install
    npx playwright install
+   pip install curl_cffi
    ```
    > **Note:** The `.` at the end of the `git clone` command ensures the repository is cloned directly into your current folder, rather than creating a new subfolder.
 
