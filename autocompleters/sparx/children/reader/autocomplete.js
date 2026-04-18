@@ -7,6 +7,152 @@ const getAIanswer = require('../../../../utils/getAIanswer.js');
 const { checkAccount } = require('../../../../database/accounts.js');
 const logger = require('../../../../utils/logger.js');
 const { colours } = require('../../../../config.json');
+const { addToDb, checkAnswer } = require('../../../../database/reader.js');
+const getApiKeys = require('../../../../utils/getApiKeys.js');
+const addApiKeyExhausted = require('../../../../utils/addApiKeyExhausted.js');
+const { answerQuestionAi } = require('../../../../gemini/sparx_reader/main.js');
+
+class sparxReaderAutocompleter {
+    constructor(requesticator, apikeys, log) {
+        this.requesticator = requesticator;
+        this.apikeys = apikeys;
+        this.log = log;
+        this.cancelActive = false;
+    }
+
+    async answerQuestion(extract, taskId, first, answer, identifier) {
+
+        let url = 'https://api.sparx-learning.com/reader/sparx.reading.tasks.v1.Tasks/SendTaskAction';
+
+        if (first) {
+            const questionObj = await this.requesticator.proceedQuestion(taskId);
+            if (questionObj === 9) {
+                // console.log("Finished questions!");
+                return;
+            }
+            identifier = questionObj.questionIdentifier;
+
+            answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
+            if (typeof answer === 'number') return answer;
+        }
+
+        let answerObj = {
+            "taskId": taskId,
+            "action": {
+                "action": {
+                    "oneofKind": "paperback",
+                    "paperback": {
+                        "action": {
+                            "oneofKind": "answer",
+                            "answer": answer
+                        },
+                        "identifier": identifier
+                    }
+                }
+            },
+            "catchUpMode": false,
+            "signatureEvent": {
+                "signatures": []
+            }
+        };
+
+        let fullMessage = await this.requesticator.encodeStuff(answerObj, 'SendTaskActionRequest');
+
+        const questionBuffer = await this.requesticator.send(url, fullMessage);
+
+        if (questionBuffer.headers['grpc-status'] === '16') {
+            return;
+        }
+
+        const questionFull = await this.requesticator.decodeStuff(questionBuffer.data, 'SendTaskActionResponse');
+
+        if (questionFull?.task?.state?.state?.paperback?.results) {
+            await this.handleDbAdd(questionFull.task.state.state.paperback.results);
+        }
+
+        if (questionFull?.task?.state?.experience) {
+            const returnObj = {
+                experience: questionFull.task.state.experience,
+                results: questionFull.task.state.results
+            };
+            return returnObj;
+        }
+
+        if (questionFull?.task?.state?.state?.paperback?.currentQuestion) {
+            const questionIdentifier = questionFull.task.state.state.paperback.currentQuestion.questionId;
+            const questionText = questionFull.task.state.state.paperback.currentQuestion.questionText;
+            const questionOptions = questionFull.task.state.state.paperback.currentQuestion.options;
+
+            const questionObj = {
+                questionIdentifier: questionIdentifier,
+                questionText: questionText,
+                questionOptions: questionOptions
+            };
+
+            answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
+            if (typeof answer === 'number') return answer;
+
+            return await this.answerQuestion(extract, taskId, false, answer, questionObj.questionIdentifier);
+        }
+
+        const questionObj = await this.requesticator.proceedQuestion(taskId);
+        if (questionObj === 9) {
+            await this.requesticator.retryQuestion(taskId);
+            return {
+                experience: 0,
+                results: []
+            };
+        } else if (questionObj?.experience) {
+            return questionObj;
+        }
+
+        answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
+        if (typeof answer === 'number') return answer;
+
+        return await this.answerQuestion(extract, taskId, false, answer, questionObj.questionIdentifier);
+    }
+
+    async handleDbAdd(results) {
+        for (const result of results) {
+            if (result.correct) {
+                await addToDb(result.questionId, result.answer, []);
+            } else {
+                await addToDb(result.questionId, null, [result.answer]);
+            }
+        }
+    }
+
+    async getAnswer(id, extract, questionObj) {
+        const result = await checkAnswer(id);
+        const apikeys = await getApiKeys(this.apikeys);
+        if (typeof(result) === "string") {
+            return result;
+        } else {
+            let answer;
+
+            const aiArgs = Array.isArray(result)
+                ? [extract, questionObj.questionText, questionObj.questionOptions, result]
+                : [extract, questionObj.questionText, questionObj.questionOptions];
+
+            for (const apikey of apikeys) {
+                answer = await answerQuestionAi(apikey, ...aiArgs);
+                if (answer === 429) await addApiKeyExhausted(apikey);
+                if (typeof answer !== 'number') break;
+            }
+
+            return answer;
+        }
+    }
+
+  async maintainActive() {
+    await this.requesticator.sendUserActive();
+
+    setInterval(() => {
+      if (this.cancelActive) return;
+      this.requesticator.sendUserActive('/task');
+    }, 12_000);
+  }
+}
 
 async function autocomplete(userSession) {
     let bookUid = userSession.selectedHomework;
@@ -24,7 +170,9 @@ async function autocomplete(userSession) {
         ["mode", userSession.mode]
     ].map(([name, value]) => `${name}: ${value}`).join("\n")}`);
     // await interaction.deferUpdate();
-    userSession.requesticator.apikey = (await checkAccount(userSession.interaction.user.id)).apikey;
+
+    const userApiKeys = (await checkAccount(userSession.interaction.user.id)).apikeys;
+    const sparxReaderExecuter = new sparxReaderAutocompleter(userSession.requesticator, userApiKeys, log);
     const queue = require('./queue.js');
     let readUntilFinish = userSession.mode === 'Read Until Book Completed';
     // let readUntilGold = userSession.mode === 'Read Until Gold Reader Acquired';
@@ -58,6 +206,7 @@ async function autocomplete(userSession) {
     };
     const progressUpdater = new progressTracker(userSession.interaction, getTimeField);
     if (await progressUpdater.start(initialEmbed, row, sectionsProgress)) return;
+    await sparxReaderExecuter.maintainActive();
     const shouldStop = async () => !((pointsAcquired < settings.srp || readUntilFinish) && timesO < 10 && !progressUpdater.cancelled && (await queue.stillUsing(userSession.interaction.user.id)));
 
     try {
@@ -99,7 +248,7 @@ async function autocomplete(userSession) {
 
             log.logToFile(`About to get AI Answer`);
             const results = await getAIanswer(
-                () => userSession.requesticator.answerQuestion(bookText, taskId, true),
+                () => sparxReaderExecuter.answerQuestion(bookText, taskId, true),
                 queue,
                 userSession.interaction,
                 progressUpdater,
@@ -138,6 +287,8 @@ async function autocomplete(userSession) {
         log.logToFile("Error caught");
         log.logToFile(err);
         logError(err, null, 'Sparx Reader');
+    } finally {
+        sparxReaderExecuter.cancelActive = true;
     }
 
     await log.send(userSession.interaction.user);

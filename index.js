@@ -381,11 +381,7 @@ client.on('interactionCreate', async (interaction) => {
             flags: MessageFlags.Ephemeral
         };
 
-        if (interaction.isRepliable()) {
-            await interaction.reply(errorMessage);
-        } else if (interaction.deferred || interaction.replied) {
-            await interaction.followUp(errorMessage);
-        }
+        await interaction.followUp(errorMessage);
     }
 });
 

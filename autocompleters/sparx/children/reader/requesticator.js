@@ -10,6 +10,12 @@ class SparxReader extends SparxBase {
         super(authToken, login, cookies, decode, encode);
     }
 
+    async sendUserActive(path) {
+        const url = 'https://api.sparx-learning.com/reader/sparx.reading.users.v1.Sessions/UserActive';
+        let fullMessage = await this.encodeStuff({"currentPath": path}, 'UserActiveRequest');
+        await this.send(url, fullMessage);
+    } // /library; /task;
+
     async startSwappedBook(bookObj) {
         let url = 'https://api.sparx-learning.com/reader/sparx.reading.users.librarybooks.v1.LibraryBooks/UpdateLibraryBook';
         bookObj.swapped = 1;
@@ -18,7 +24,6 @@ class SparxReader extends SparxBase {
         // console.log('Update book input', {studentBook: bookObj});
 
         let fullMessage = await this.encodeStuff({studentBook: bookObj}, 'UpdateLibraryBookRequest');
-        // console.log('Full message', fullMessage);
         const userInfoBuffer = await this.send(url, fullMessage);
         await this.decodeStuff(userInfoBuffer.data, 'UpdateLibraryBookResponse');
         // console.log('Book update response', bookUpdateResponse);
@@ -152,23 +157,7 @@ class SparxReader extends SparxBase {
 
         // console.log(bookText);
 
-        /*
-        const jsonData = JSON.stringify(bookText, null, 2); // pretty print with 2-space indentation
-        console.log(jsonData);
-        const filePath = path.resolve(__dirname, '../data.json'); // or './data.json' to write to current folder
-
-        // Write to file
-        fs.writeFile(filePath, jsonData, (err) => {
-        if (err) {
-            console.error('Error writing file', err);
-        } else {
-            console.log('JSON data written to file successfully');
-        }
-        });
-        */
-
         return { paragraph: paragraph, wordCount: wordCount };
-
     }
 
     async getBookTask(bookId) {
@@ -311,139 +300,6 @@ class SparxReader extends SparxBase {
         // console.log(questionFull.task.state.state.paperback);
     }
 
-    async answerQuestion(extract, taskId, first, answer, identifier) {
-
-        let url = 'https://api.sparx-learning.com/reader/sparx.reading.tasks.v1.Tasks/SendTaskAction';
-
-        if (first) {
-            const questionObj = await this.proceedQuestion(taskId);
-            if (questionObj === 9) {
-                // console.log("Finished questions!");
-                return;
-            }
-            identifier = questionObj.questionIdentifier;
-            // console.log(`Question Identifier: ${identifier}`);
-
-            /*
-            const answerDigit = await answerQuestionAi(extract, questionObj.questionText, questionObj.questionOptions);
-            answer = questionObj.questionOptions[answerDigit-1];
-            */
-            answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
-            if (typeof answer === 'number') return answer;
-        }
-        // console.log(`Answer: ${answer}`);
-        // console.log("Pre");
-
-        let answerObj = {
-            "taskId": taskId,
-            "action": {
-                "action": {
-                    "oneofKind": "paperback",
-                    "paperback": {
-                        "action": {
-                            "oneofKind": "answer",
-                            "answer": answer
-                        },
-                        "identifier": identifier
-                    }
-                }
-            },
-            "catchUpMode": false,
-            "signatureEvent": {
-                "signatures": []
-            }
-        };
-
-        let fullMessage = await this.encodeStuff(answerObj, 'SendTaskActionRequest');
-
-        // console.log("Answer question buffer base calls send");
-        const questionBuffer = await this.send(url, fullMessage);
-
-        /*
-        console.log("Answer question");
-        console.log(questionBuffer.headers);
-        console.log("-----");
-        */
-
-        if (questionBuffer.headers['grpc-status'] === '16') {
-            // console.log(`The network request was unsuccessful: ${questionBuffer.headers['grpc-message']}`);
-            return;
-        }
-
-        const questionFull = await this.decodeStuff(questionBuffer.data, 'SendTaskActionResponse');
-
-        // console.log("Base");
-        // console.log(questionFull?.task?.state?.state?.paperback?.results);
-        if (questionFull?.task?.state?.state?.paperback?.results) {
-            await this.handleDbAdd(questionFull.task.state.state.paperback.results);
-        }
-
-
-        if (questionFull?.task?.state?.experience) {
-            // console.log(`Experience Gained: ${questionFull.task.state.experience}`);
-            const returnObj = {
-                experience: questionFull.task.state.experience,
-                results: questionFull.task.state.results
-            };
-            return returnObj;
-        }
-
-        if (questionFull?.task?.state?.state?.paperback?.currentQuestion) {
-            // console.log("Other path");
-            const questionIdentifier = questionFull.task.state.state.paperback.currentQuestion.questionId;
-            const questionText = questionFull.task.state.state.paperback.currentQuestion.questionText;
-            const questionOptions = questionFull.task.state.state.paperback.currentQuestion.options;
-
-            const questionObj = {
-                questionIdentifier: questionIdentifier,
-                questionText: questionText,
-                questionOptions: questionOptions
-            };
-
-
-            // console.log(questionObj.questionText);
-            // console.log(questionObj.questionOptions);
-            // console.log(questionObj.questionIdentifier);
-
-            /*
-            const answerDigit = await answerQuestionAi(extract, questionObj.questionText, questionObj.questionOptions);
-            answer = questionObj.questionOptions[answerDigit-1];
-            */
-            answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
-            if (typeof answer === 'number') return answer;
-
-            return await this.answerQuestion(extract, taskId, false, answer, questionObj.questionIdentifier);
-        }
-
-        const questionObj = await this.proceedQuestion(taskId);
-        if (questionObj === 9) {
-            // console.log("Finished questions!");
-            await this.retryQuestion(taskId);
-            return {
-                experience: 0,
-                results: []
-            };
-        } else if (questionObj?.experience) {
-            // console.log("Finished questions early with this xp!");
-            // console.log(questionObj.experience);
-            return questionObj;
-        }
-
-        // console.log(questionObj.questionText);
-        // console.log(questionObj.questionOptions);
-        // console.log(questionObj.questionIdentifier);
-
-        /*
-        const answerDigit = await answerQuestionAi(extract, questionObj.questionText, questionObj.questionOptions);
-        answer = questionObj.questionOptions[answerDigit-1];
-        */
-        answer = await this.getAnswer(questionObj.questionIdentifier, extract, questionObj);
-        if (typeof answer === 'number') return answer;
-
-        return await this.answerQuestion(extract, taskId, false, answer, questionObj.questionIdentifier);
-
-    }
-
     async getNewBookOptions() {
         let url = 'https://api.sparx-learning.com/reader/sparx.reading.users.librarybooks.v1.LibraryBooks/ListNewBooks';
 
@@ -457,41 +313,6 @@ class SparxReader extends SparxBase {
         const userDisplayData = await this.decodeStuff(userDisplayBuffer.data, 'ListNewBooksResponse');
 
         return userDisplayData;
-    }
-
-    async handleDbAdd(results) {
-        for (const result of results) {
-            if (result.correct) {
-                await addToDb(result.questionId, result.answer, []);
-            } else {
-                await addToDb(result.questionId, null, [result.answer]);
-            }
-        }
-    }
-
-    async getAnswer(id, extract, questionObj) {
-        const result = await checkAnswer(id);
-        const apikeys = await getApiKeys();
-        // console.log(`Result for ${id}: ${result}`);
-        if (typeof(result) === "string") {
-            // console.log("DB is Correct");
-            return result;
-        } else {
-            // DB has incorrect section (array) OR is null
-            let answer;
-
-            const aiArgs = Array.isArray(result)
-                ? [extract, questionObj.questionText, questionObj.questionOptions, result]
-                : [extract, questionObj.questionText, questionObj.questionOptions];
-
-            for (const apikey of apikeys) {
-                answer = await answerQuestionAi(apikey, ...aiArgs);
-                if (answer === 429) await addApiKeyExhausted(apikey);
-                if (typeof answer !== 'number') break;
-            }
-
-            return answer;
-        }
     }
 }
 

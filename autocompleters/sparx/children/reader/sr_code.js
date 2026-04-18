@@ -102374,7 +102374,8 @@ const classNames = {
     "ListNewBooksRequest": Fst,
     "ListNewBooksResponse": Ust,
     "UpdateLibraryBookRequest": Hst,
-    "UpdateLibraryBookResponse": Vst
+    "UpdateLibraryBookResponse": Vst,
+    "UserActiveRequest": Zat
 };
 
 async function decode(bytes, decoderClassName) {
