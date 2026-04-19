@@ -231,6 +231,9 @@ client.once("clientReady", async () => {
     await DeleteVideos();
 });
 
+client.on('disconnect', () => console.log('Bot disconnected!'));
+client.on('error', (error) => console.error('WebSocket Error:', error));
+
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -376,8 +379,15 @@ client.on('interactionCreate', async (interaction) => {
         }
 
     } catch (error) {
+        const stack = error.stack ?? "No stack trace available";
+
+        // Keep message under Discord's 2000 char limit
+        const trimmedStack = stack.length > 1500
+            ? stack.slice(0, 1500) + "\n... (truncated)"
+            : stack;
+
         const errorMessage = {
-            content: `⚠️ An error occurred: \`${error.message}\``,
+            content: `⚠️ An error occurred:\n\`\`\`\n${error.message}\n\n${trimmedStack}\n\`\`\``,
             flags: MessageFlags.Ephemeral
         };
 

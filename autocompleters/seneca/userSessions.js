@@ -78,10 +78,12 @@ class userSession {
             .setMinValues(0)
             .setMaxValues(1);
         
+        let count = 0;
         for (const assignment of this.assignments.items) {
             if (assignment.status === 'COMPLETE') {
                 continue; // ${Math.round(quiz.correctCount / quiz.questionCount * 100)}% • 
             }
+            if (count >= 25) break;
             const option = new StringSelectMenuOptionBuilder()
                 .setLabel(assignment.name)
                 .setDescription(`${dueDate(new Date(assignment.dueDate))}`)
@@ -89,6 +91,7 @@ class userSession {
                 .setDefault(assignment.id === this.selectedHomework);
 
             select.addOptions(option);
+            count++;
         }
 
         this.select = select;
