@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+const withRetry = require('../utils/withRetry');
 
 // aes256-gcm.js (Node.js)
 const crypto = require("crypto");
@@ -108,4 +109,9 @@ async function checkAccounts(discord_id, master_password) {
     }
 }
 
-module.exports = { addAccount, checkAccounts, deleteAccounts, updateSavedAccounts};
+module.exports = { 
+    addAccount: withRetry(addAccount), 
+    checkAccounts: withRetry(checkAccounts), 
+    deleteAccounts: withRetry(deleteAccounts), 
+    updateSavedAccounts: withRetry(updateSavedAccounts) 
+};

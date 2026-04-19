@@ -3,6 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const config = require('../config.json');
 const hashCompare = require('../utils/hashCompare');
 const { updateDB } = require('./general');
+const withRetry = require('../utils/withRetry');
 
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
@@ -198,4 +199,16 @@ async function setDefault(table, column) {
   if (error) throw error;
 }
 
-module.exports = { addToDb, setDefault, updateStats, removeMainAccount, getAudit, clearSpecificService, resetAllUses, checkDuplicatesMainAccounts, checkAccount, addMainAccount, activateFreeTrial };
+module.exports = { 
+    addToDb: withRetry(addToDb), 
+    setDefault: withRetry(setDefault), 
+    updateStats: withRetry(updateStats), 
+    removeMainAccount: withRetry(removeMainAccount), 
+    getAudit: withRetry(getAudit), 
+    clearSpecificService: withRetry(clearSpecificService), 
+    resetAllUses: withRetry(resetAllUses), 
+    checkDuplicatesMainAccounts: withRetry(checkDuplicatesMainAccounts), 
+    checkAccount: withRetry(checkAccount), 
+    addMainAccount: withRetry(addMainAccount), 
+    activateFreeTrial: withRetry(activateFreeTrial)
+};

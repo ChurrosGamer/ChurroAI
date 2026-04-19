@@ -74,16 +74,18 @@ class SparxBase {
 
             // 3. Return successful response
             return response;
-
         } catch (err) {
-            // If we are out of attempts, throw the error immediately
+            // 1. If we are out of attempts, add context to the error and throw
             if (attempts <= 1) {
+                const failMsg = `Request failed after exhausting all retries. Last error: ${err.message}`;
+                this.log.logToFile(`[GIVING UP] ${failMsg}`);
+                err.message = failMsg; // Updates the error message so the caller sees the context
                 throw err;
             }
 
             // Wait 5 seconds before retrying
             await new Promise(res => setTimeout(res, 5000));
-            this.log.logToFile(err);
+            this.log.logToFile(`Attempting retry... (${attempts - 1} attempts left). Caught error: ${err.message}`);
 
             // 4. Handle 401 Re-authentication
             if (err.response?.status === 401) {
@@ -105,8 +107,13 @@ class SparxBase {
                     }
                 } else {
                     newAuthToken = await getTokenRequest(this.cookies);
+                    
+                    // 2. If strictly unauthorized, add context to the error and throw
                     if (newAuthToken?.includes('Unauthorized')) {
-                        throw err; // Stop retrying if strictly unauthorized
+                        const tokenFailMsg = `Failed to get a new token: The server returned Strictly Unauthorized.`;
+                        this.log.logToFile(`[FATAL] ${tokenFailMsg}`);
+                        err.message = tokenFailMsg; // Update error message
+                        throw err; // Stop retrying
                     }
                 }
 

@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const withRetry = require('../utils/withRetry');
 
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
@@ -66,4 +67,7 @@ async function getBookworks(package_id) {
     }
 }
 
-module.exports = { addToDbBookwork, getBookworks };
+module.exports = { 
+    addToDbBookwork: withRetry(addToDbBookwork), 
+    getBookworks: withRetry(getBookworks)
+};

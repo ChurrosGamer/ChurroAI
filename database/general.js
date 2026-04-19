@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const withRetry = require('../utils/withRetry');
 
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
@@ -44,4 +45,9 @@ async function deleteEntryDB(table_name, matchColumn, matchData) {
         .throwOnError();    
 }
 
-module.exports = { appendToDB, updateDB, getFromDB, deleteEntryDB };
+module.exports = { 
+    appendToDB: withRetry(appendToDB), 
+    updateDB: withRetry(updateDB), 
+    getFromDB: withRetry(getFromDB), 
+    deleteEntryDB: withRetry(deleteEntryDB)
+};

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { updateDB, appendToDB } = require('./general');
+const withRetry = require('../utils/withRetry');
 
 const supabaseUrl = process.env.SUPABASEURL;
 const supabaseKey = process.env.SUPABASEKEY;
@@ -65,4 +66,7 @@ async function checkAnswer(id, questionObj) {
     return null;
 }
 
-module.exports = { addToDb, checkAnswer};
+module.exports = { 
+    addToDb: withRetry(addToDb), 
+    checkAnswer: withRetry(checkAnswer)
+};
