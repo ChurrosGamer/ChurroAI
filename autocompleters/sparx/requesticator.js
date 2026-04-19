@@ -44,13 +44,8 @@ class SparxBase {
 
             // 2. Handle gRPC Specific Statuses and Messages
             if (grpcStatus) {
-                if (grpcStatus === '8') {
-                    return 8;
-                }
-
-                if (grpcStatus === '9' && grpcMessage === 'wrong question state for answer action') {
-                    return 9;
-                }
+                if (grpcStatus === '8') return 8;
+                if (grpcStatus === '9' && grpcMessage === 'wrong question state for answer action') return 9;
 
                 if (['16', '9', '7'].includes(grpcStatus)) {
                     if (grpcMessage === 'TaskItemHidden') {
@@ -66,7 +61,6 @@ class SparxBase {
                         if (typeof this.getClientSession === 'function') {
                             await this.getClientSession();
                         }
-                        // Retry without decrementing attempts (from original logic)
                         return await this.send(url, uint8Array, attempts); 
                     }
                 }
@@ -75,64 +69,83 @@ class SparxBase {
             // 3. Return successful response
             return response;
         } catch (err) {
-            // 1. If we are out of attempts, add context to the error and throw
+            // 1. Check attempts
             if (attempts <= 1) {
                 const failMsg = `Request failed after exhausting all retries. Last error: ${err.message}`;
                 this.log.logToFile(`[GIVING UP] ${failMsg}`);
-                err.message = failMsg; // Updates the error message so the caller sees the context
+                err.message = failMsg; 
                 throw err;
             }
 
-            // Wait 5 seconds before retrying
-            await new Promise(res => setTimeout(res, 5000));
-            this.log.logToFile(`Attempting retry... (${attempts - 1} attempts left). Caught error: ${err.message}`);
-
-            // 4. Handle 401 Re-authentication
+            // 2. Handle 401 Re-authentication WITH A LOCK
             if (err.response?.status === 401) {
-                this.log.logToFile("Caught 401 Unauthorized, handling it attempting relogin...");
-
-                let newAuthToken;
-                if (this.login?.school) {
-                    const newAuthTokenN = await getTokenSparx({
-                        school: this.login.school,
-                        username: this.login.username,
-                        password: this.login.password,
-                        type: this.login.type
-                    });
-                    if (newAuthTokenN?.cookies) {
-                        this.cookies = newAuthTokenN.cookies;
-                    }
-                    if (newAuthTokenN?.authToken) {
-                        newAuthToken = newAuthTokenN.authToken;
-                    }
+                this.log.logToFile("Caught 401 Unauthorized.");
+                
+                // If a login isn't already happening, start one
+                if (!this.authPromise) {
+                    this.log.logToFile("Initiating new login process...");
+                    this.authPromise = this._reauthenticate();
                 } else {
-                    newAuthToken = await getTokenRequest(this.cookies);
-                    
-                    // 2. If strictly unauthorized, add context to the error and throw
-                    if (newAuthToken?.includes('Unauthorized')) {
-                        const tokenFailMsg = `Failed to get a new token: The server returned Strictly Unauthorized.`;
-                        this.log.logToFile(`[FATAL] ${tokenFailMsg}`);
-                        err.message = tokenFailMsg; // Update error message
-                        throw err; // Stop retrying
-                    }
+                    this.log.logToFile("Login already in progress, waiting for it to finish...");
                 }
 
-                if (newAuthToken) {
-                    this.log.logToFile('The new authtoken has been successfully acquired!');
-                    this.authToken = newAuthToken;
-                    this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
-                    
-                    // Included from Method 1: refresh client session on new token
-                    if (typeof this.getClientSession === 'function') {
-                        await this.getClientSession();
-                    }
-                } else {
-                    this.log.logToFile('Unable to login after 401 status code');
+                // Both the heartbeat and the main request will wait right here!
+                await this.authPromise; 
+
+            } else {
+                // 3. It's a standard network error, so apply the 5-second delay before retry
+                this.log.logToFile(`Attempting retry... (${attempts - 1} attempts left). Caught error: ${err.message}`);
+                await new Promise(res => setTimeout(res, 5000));
+            }
+
+            // 4. Retry request
+            return await this.send(url, uint8Array, attempts - 1);
+        }
+    }
+
+    async _reauthenticate() {
+        try {
+            this.log.logToFile("Starting re-authentication process...");
+            let newAuthToken;
+
+            if (this.login?.school) {
+                const newAuthTokenN = await getTokenSparx({
+                    school: this.login.school,
+                    username: this.login.username,
+                    password: this.login.password,
+                    type: this.login.type
+                });
+                if (newAuthTokenN?.cookies) {
+                    this.cookies = newAuthTokenN.cookies;
+                }
+                if (newAuthTokenN?.authToken) {
+                    newAuthToken = newAuthTokenN.authToken;
+                }
+            } else {
+                newAuthToken = await getTokenRequest(this.cookies);
+                
+                if (newAuthToken?.includes('Unauthorized')) {
+                    const tokenFailMsg = `Failed to get a new token: The server returned Strictly Unauthorized.`;
+                    this.log.logToFile(`[FATAL] ${tokenFailMsg}`);
+                    throw new Error(tokenFailMsg); 
                 }
             }
 
-            // 5. Retry request (handles both 401s after re-auth, and generic network errors)
-            return await this.send(url, uint8Array, attempts - 1);
+            if (newAuthToken) {
+                this.log.logToFile('The new authtoken has been successfully acquired!');
+                this.authToken = newAuthToken;
+                this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
+                
+                if (typeof this.getClientSession === 'function') {
+                    await this.getClientSession();
+                }
+            } else {
+                this.log.logToFile('Unable to login after 401 status code');
+                throw new Error("Authentication failed: No token returned");
+            }
+        } finally {
+            // CRITICAL: Clear the promise lock so future 401s can trigger a new login if needed
+            this.authPromise = null;
         }
     }
 
