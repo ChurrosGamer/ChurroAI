@@ -2,6 +2,7 @@ const getOptionalUserSession = require('../utils/getOptionalUserSession.js');
 const seperateParentChild = require('../utils/seperateParentChild.js');
 const { updateDB } = require('../database/general');
 const { MessageFlags, EmbedBuilder } = require('discord.js');
+const { colours } = require('../config.json');
 
 async function processSettings(interaction) {
     await interaction.deferUpdate();

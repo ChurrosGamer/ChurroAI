@@ -19,6 +19,10 @@ const getParent = require('./utils/getParent.js');
 const processSettings = require('./generic/processSettings.js');
 const seperateParentChild = require('./utils/seperateParentChild.js');
 const processLogin = require('./generic/processLogin.js');
+const axios = require('axios');
+const FormData = require('form-data');
+const { colours } = require('./config.json');
+const sendStartedMessage = require('./utils/sendStartedMessage.js');
 // Ensure the file exists
 if (!fs.existsSync('logs.txt')) {
     fs.writeFileSync('logs.txt', ''); // create an empty file
@@ -37,13 +41,45 @@ console.log = function (...args) {
 };
 
 async function cleanAllLogs(dir = './sessionLogs') {
-    for (const name of fs.readdirSync(dir)) {
+    const files = fs.readdirSync(dir);
+
+    for (const name of files) {
         if (name === ".gitkeep") continue;
 
-        fs.rmSync(path.join(dir, name), {
-            recursive: true,
-            force: true,
-        });
+        const filePath = path.join(dir, name);
+        const stats = fs.statSync(filePath);
+
+        // Optional: Skip empty files
+        if (stats.size === 0) {
+            fs.rmSync(filePath, { force: true });
+            continue;
+        }
+
+        const form = new FormData();
+        const embed = {
+            title: 'Session Logs (Cleanup)',
+            description: `Logs uploaded at **${new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')}**`,
+            color: colours.onyx,
+            fields: [
+                { name: 'File Path', value: filePath },
+            ]
+        };
+
+        form.append('file', fs.createReadStream(filePath), { filename: name });
+        form.append('payload_json', JSON.stringify({ embeds: [embed] }));
+
+        try {
+            await axios.post(process.env.WEBHOOK_URL, form, { 
+                headers: form.getHeaders(),
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity
+            });
+
+            // Only delete the file IF the webhook sends successfully
+            fs.rmSync(filePath, { force: true });
+        } catch (error) {
+            console.error(`Failed to send log ${name}:`, error.response ? error.response.data : error.message);
+        }
     }
 }
 
@@ -91,6 +127,7 @@ client.on('warn', (info) => {
 
 client.on('clientReady', () => {
     console.log(`Logged in as ${client.user.tag}!`);
+    sendStartedMessage(client);
 });
 
 client.commands = new Collection();
