@@ -402,6 +402,7 @@ async function sparxMathsAutocomplete(userSession) {
                         }
 
                         log.logToFile("Bookwork not found in the stuff");
+                        throw new Error("Bookwork not found in the stuff");
                         let commonAnswersPrevious = [];
 
                         let counterComplete = 0;
@@ -477,7 +478,7 @@ async function sparxMathsAutocomplete(userSession) {
                     }
 
                     let failedQuestion = null;
-                    if (questionObjectSend) {
+                    if (!questionObjectSend) {
                         failedQuestion = await getFromDB('sparx_maths_failed', 'question', canonicalize(item.payload.question.questionSpec));
                         log.logToFile('Failed question', failedQuestion);
                         if (failedQuestion) {
