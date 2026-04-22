@@ -69,7 +69,7 @@ async function cleanAllLogs(dir = './sessionLogs') {
         form.append('payload_json', JSON.stringify({ embeds: [embed] }));
 
         try {
-            await axios.post(process.env.WEBHOOK_URL, form, { 
+            await axios.post(process.env.LOGS_WEBHOOK_URL, form, { 
                 headers: form.getHeaders(),
                 maxBodyLength: Infinity,
                 maxContentLength: Infinity

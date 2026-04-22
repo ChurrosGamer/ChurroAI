@@ -144,10 +144,6 @@ class geminiAnswers {
                 type: Type.BOOLEAN,
                 description: 'If the question wants you to give the answer as a bearing then set this as true.'
             };
-            properties['WORKING OUT'] = {
-                type: Type.STRING,
-                description: 'Please provide working out for the question. PLEASE be concise. Use LATEX however always use a ; to notate a new line'
-            };
         }
 
         if (sparx === 'science') {
@@ -216,6 +212,8 @@ class geminiAnswers {
                 }
             }
         }
+
+        delete answerObj.BearingAsAnswer;
 
         return answerObj;
 

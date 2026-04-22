@@ -5,7 +5,7 @@ const fs = require('fs');
 const FormData = require('form-data');
 const { colours } = require('../config.json');
 
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL = process.env.ERROR_WEBHOOK_URL;
 
 async function logError(error, userId, tool, additionalInfo = '') {
     try {

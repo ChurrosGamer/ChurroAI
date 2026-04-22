@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const util = require('util');
 const FormData = require('form-data');
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL = process.env.LOGS_WEBHOOK_URL;
 const { colours } = require('../config.json');
 
 class logger {

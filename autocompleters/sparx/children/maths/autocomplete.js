@@ -2,7 +2,7 @@ const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, MessageFlags
 const fs = require('fs').promises;
 const { emojis, colours } = require('../../../../config.json');
 const { getBookworks, addToDbBookwork } = require('../../../../database/bookwork.js');
-const { appendToDB, getFromDB, updateDB } = require('../../../../database/general.js');
+const { appendToDB, getFromDB, updateDB, getSparxQuestion } = require('../../../../database/general.js');
 const { getBookworkCheckAnswer } = require('./bookwork.js');
 const { convertToPDF } = require('./latexPDF.js');
 const { logError } = require('../../../../utils/errorLogger.js');
@@ -17,40 +17,7 @@ const { checkAccount } = require('../../../../database/accounts.js');
 const isHigherModel = require('../../../../utils/isHighestModel.js');
 const makeGroupArray = require('../../../../utils/makeGroupArray.js');
 const SparxQuestionParser = require('./parser');
-
-function stripWorkingOut(obj) {
-    const result = {};
-
-    for (const [key, value] of Object.entries(obj)) {
-        if (
-            typeof value === "object" &&
-            value !== null &&
-            "answer" in value &&
-            "working_out" in value
-        ) {
-            // Only keep the answer if it's split like this
-            result[key] = value.answer;
-        } else {
-            // Leave untouched if structure doesn't match
-            result[key] = value;
-        }
-    }
-
-    return result;
-}
-
-function getWorkingOutData(arr) {
-    const index = arr.findIndex(item => item.key === 'WORKING OUT');
-
-    let workingOut;
-    if (index !== -1) {
-        workingOut = arr[index].value;
-        arr.splice(index, 1);
-    }
-
-    return workingOut;
-}
-
+const canonicalize = require('../../../../utils/canonicalize.js');
 
 class sparxMathsAutocompleter {
     constructor(sparxMaths, interaction, packageID, fakeTimeSettings, log, pdfSettings) {
@@ -64,6 +31,10 @@ class sparxMathsAutocompleter {
         this.startTimestamp = Math.floor(Date.now() / 1000);
         this.totalFakeTime = 0;
         this.fakeTimeSettings = fakeTimeSettings;
+    }
+
+    async getAnswerFromDB(question) {
+        return await getSparxQuestion(question.content);
     }
 
     async sendBookWork() {
@@ -80,7 +51,7 @@ class sparxMathsAutocompleter {
             console.error("Failed to parse bookworks:", err);
         }
 
-        const pdfAttachment = await convertToPDF(bookworksObj, this.packageID, this.pdfSettings.working_out, this.pdfSettings.question);
+        const pdfAttachment = await convertToPDF(bookworksObj, this.packageID, false, this.pdfSettings.question);
         let fileExists = false;
         if (pdfAttachment) {
             fileExists = await fs.access(pdfAttachment).then(() => true).catch(() => false);
@@ -147,7 +118,7 @@ class sparxMathsAutocompleter {
         return await this.sparxMaths.readyQuestion(readyObj);
     }
 
-    async answerQuestion(answerObject, sparxMathsExecuter, working_out, question) {
+    async answerQuestion(answerObject, sparxMathsExecuter, question) {
         const answerResponse = await this.sparxMaths.answerQuestion(answerObject);
         this.log.logToFile('---');
         this.log.logToFile(answerResponse);
@@ -161,7 +132,7 @@ class sparxMathsAutocompleter {
                 .replace(/\s+/g, ' ')     // normalize multiple spaces
                 .trim();                   // remove leading/trailing spaces
 
-            await sparxMathsExecuter.addAnswer({ answer: result, working_out, question });
+            await sparxMathsExecuter.addAnswer({ answer: result, question });
             return true;
         }
 
@@ -259,31 +230,6 @@ class sparxMathsAutocompleter {
 
 }
 
-async function checkDB(question, activityIndex, questionIndex, interaction) {
-    const answer = await getFromDB('sparx_maths', 'question', question, 'answer');
-    if (!answer) {
-        return answer;
-    }
-
-    const answerObject = {
-        "activityIndex": activityIndex,
-        "action": {
-            "oneofKind": "question",
-            "question": {
-                "questionIndex": questionIndex,
-                "actionType": 1,
-                "answer": {
-                    "components": answer,
-                    "hash": ""
-                }
-            }
-        },
-        "timestamp": userAutocompleters[interaction.user.id].getTimestamp(true)
-    };
-
-    return answerObject;
-}
-
 function addGroup(task) {
     let progressEntry = {
         name: task.title
@@ -295,6 +241,55 @@ function addGroup(task) {
     }
 
     return progressEntry;
+}
+
+function parseQuestionForDB(rquestion) {
+    // Helper to prevent JSON.parse(undefined) errors in canonicalize
+    const question = JSON.parse(rquestion)[0];
+    const safeCanonicalize = (data, fallback) => {
+        if (data === undefined || data === null) return fallback;
+        try {
+            return canonicalize(data);
+        } catch {
+            console.warn("⚠️ Canonicalize failed, returning fallback.");
+            return fallback;
+        }
+    };
+
+    let elementStr = null;
+    let typeArr = null;
+    let contentArr = [];
+    let inputObj = {};
+
+    // FORMAT 1: Has "layout" and "input" (e.g., Multiple Choice)
+    if (question && question.layout) {
+        elementStr = question.layout.element;
+        typeArr = question.layout.type;
+        contentArr = question.layout.content;
+        inputObj = question.input || {};
+    } 
+    // FORMAT 2: Direct Object (e.g., Number Field / Part-Group)
+    else if (question && question.element) {
+        elementStr = question.element;
+        typeArr = question.type;
+        contentArr = question.content;
+        // inputObj remains {} because this format doesn't have an "input" dictionary
+    }
+
+    // Prepare Payload mapped to your table columns
+    return {
+        element: elementStr || null,
+        type: typeArr || null,
+        content: safeCanonicalize(contentArr, []),
+        cards: safeCanonicalize(inputObj.cards, {}),
+        choices: safeCanonicalize(inputObj.choices, {}),
+        slots: safeCanonicalize(inputObj.slots, {}),
+        number_fields: safeCanonicalize(inputObj.number_fields, {}),
+        text_fields: safeCanonicalize(inputObj.text_fields, {}),
+        card_groups: safeCanonicalize(inputObj.card_groups, {}),
+        slot_groups: safeCanonicalize(inputObj.slot_groups, {}),
+        choice_groups: safeCanonicalize(inputObj.choice_groups, {})
+    };
 }
 
 async function sparxMathsAutocomplete(userSession) {
@@ -329,7 +324,6 @@ async function sparxMathsAutocomplete(userSession) {
         .setDescription(`\`Starting Questions...\``);
 
     // const packageID = interaction.values[0];
-    const wantWorkingOut = settings.pdfSettings.working_out;
     const sparxMathsExecuter = new sparxMathsAutocompleter(sparxMaths, interaction, packageID, { min: settings.min, max: settings.max }, log, settings.pdfSettings);
     userSession.sparxMathsExecuter = sparxMathsExecuter;
     userAutocompleters[interaction.user.id] = sparxMathsExecuter;
@@ -394,7 +388,7 @@ async function sparxMathsAutocomplete(userSession) {
 
                         if (await progressUpdater.updateEmbed(`Answering Bookwork Check...`));
 
-                        const bookmarks = stripWorkingOut(JSON.parse((await getBookworks(packageID)).bookworks));
+                        const bookmarks = JSON.parse((await getBookworks(packageID)).bookworks);
 
                         const bookmarksCorrectAnswer = await parser.parseBookworkData(bookworkInitialData.payload.wac, bookmarks);
                         if (bookmarksCorrectAnswer) { // bookmarksCorrectAnswer
@@ -460,13 +454,31 @@ async function sparxMathsAutocomplete(userSession) {
                     await sparxMathsExecuter.readyQuestion(questionIndex, activityIndex);
 
                     let shouldTry = true;
-                    let workingOut;
-                    let questionObjectSend = await checkDB(item.payload.question.questionSpec, activityIndex, questionIndex, interaction);
+                    
+                    const dbAnswer = await sparxMathsExecuter.getAnswerFromDB(parseQuestionForDB(item.payload.question.questionSpec));
+
+                    let questionObjectSend;
+                    if (dbAnswer) {
+                        questionObjectSend = {
+                            "activityIndex": activityIndex,
+                            "action": {
+                                "oneofKind": "question",
+                                "question": {
+                                    "questionIndex": questionIndex,
+                                    "actionType": 1,
+                                    "answer": {
+                                        "components": dbAnswer,
+                                        "hash": ""
+                                    }
+                                }
+                            },
+                            "timestamp": userAutocompleters[interaction.user.id].getTimestamp(true)
+                        };
+                    }
+
                     let failedQuestion = null;
                     if (questionObjectSend) {
-                        workingOut = await getFromDB('sparx_maths', 'question', item.payload.question.questionSpec, 'working_out');
-                    } else {
-                        failedQuestion = await getFromDB('sparx_maths_failed', 'question', JSON.stringify(item.payload.question.questionSpec));
+                        failedQuestion = await getFromDB('sparx_maths_failed', 'question', canonicalize(item.payload.question.questionSpec));
                         log.logToFile('Failed question', failedQuestion);
                         if (failedQuestion) {
                             let nextBetterModel = null;
@@ -495,7 +507,7 @@ async function sparxMathsAutocomplete(userSession) {
                         return 'blank';
                     }
 
-                    if (!questionObjectSend || (!workingOut && wantWorkingOut && ai[0])) {
+                    if (!questionObjectSend && (ai[0])) {
                         alreadyInDB = false;
                         log.logToFile('Using AI Model', model);
                         questionObjectSend = await getAIanswer(
@@ -507,32 +519,23 @@ async function sparxMathsAutocomplete(userSession) {
                             3000,
                             () => progressUpdater.cancelled
                         );
-                    } else {
-                        questionObjectSend.action.question.answer.components = questionObjectSend.action.question.answer.components.map(JSON.parse);
                     }
 
-                    if (wantWorkingOut) {
-                        workingOut = getWorkingOutData(questionObjectSend.action.question.answer.components);
-                    }
-
-                    log.logToFile(questionObjectSend?.action?.question?.answer?.components, 'Working out', workingOut); // addWorkingOut
-
-                    const questionSuccess = await sparxMathsExecuter.answerQuestion(questionObjectSend, sparxMathsExecuter, workingOut, parser.parseQuestion(questionLayout[0]));
+                    const questionSuccess = await sparxMathsExecuter.answerQuestion(questionObjectSend, sparxMathsExecuter, parser.parseQuestion(questionLayout[0]));
                     if (questionSuccess) task.numTaskItemsDone++;
                     await progressUpdater.updateProgressBar(task.taskIndex - 1, task.numTaskItemsDone, task.numTaskItems);
                     if (questionSuccess && !alreadyInDB) {
-                        await appendToDB('sparx_maths', {question: item.payload.question.questionSpec, answer: questionObjectSend.action.question.answer.components});
-                        // Optionally save working out as well if you have it
-                        if (workingOut) {
-                            await updateDB('sparx_maths', {working_out: workingOut}, 'question', item.payload.question.questionSpec);
-                        }
+                        const data = parseQuestionForDB(item.payload.question.questionSpec);
+                        if (!data.content.length) throw new Error('No Data to Add!');
+                        data.answer = questionObjectSend.action.question.answer.components;
+                        await appendToDB('sparx_maths', data);
                     }
                     if (!questionSuccess) {
                         if (!failedQuestion) {
-                            await appendToDB('sparx_maths_failed', {question: JSON.stringify(item.payload.question.questionSpec), incorrect_answers: [questionObjectSend.action.question.answer.components], ai_model: model});
+                            await appendToDB('sparx_maths_failed', {question: canonicalize(item.payload.question.questionSpec), incorrect_answers: [questionObjectSend.action.question.answer.components], ai_model: model});
                         } else {
                             failedQuestion.incorrect_answers.push(questionObjectSend.action.question.answer.components);
-                            await updateDB('sparx_maths_failed', {incorrect_answers: failedQuestion.incorrect_answers, ai_model: model }, 'question', item.payload.question.questionSpec);
+                            await updateDB('sparx_maths_failed', {incorrect_answers: failedQuestion.incorrect_answers, ai_model: model }, 'question', canonicalize(item.payload.question.questionSpec));
                         }
                         if (attempts < 3) {
                             if (attempts === 1) {

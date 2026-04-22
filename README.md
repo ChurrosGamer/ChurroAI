@@ -91,7 +91,7 @@ You will need to gather several keys and IDs to fill out your `.env` file. Here 
 * **DISCORD_TOKEN**: Discord Developer Portal -> **Bot** -> Click **Reset Token**.
   ![Discord Token](https://i.postimg.cc/mrZnKTtV/image.png)
 * **ADMIN_ROLE**: The Discord Role ID for bot administrators (see tip above).
-* **RESOURCE_WEBHOOK_URL** & **WEBHOOK_URL** & **STARTUP_WEBHOOK_URL**: Go to your target Discord channel's **Settings** -> **Integrations** -> **Webhooks** and create/copy the Webhook URL.
+* **RESOURCE_WEBHOOK_URL** & **LOGS_WEBHOOK_URL** & **STARTUP_WEBHOOK_URL** & **ERROR_WEBHOOK_URL**: Go to your target Discord channel's **Settings** -> **Integrations** -> **Webhooks** and create/copy the Webhook URL.
   ![Webhook](https://i.postimg.cc/dt6r4CZX/image.png)
 * **SUPABASEURL**: Formatted as `https://PROJECT_ID.supabase.co`. You can find your Project ID in Supabase under **Settings** -> **General**.
 
