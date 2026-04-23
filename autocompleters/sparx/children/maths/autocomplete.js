@@ -19,6 +19,16 @@ const makeGroupArray = require('../../../../utils/makeGroupArray.js');
 const SparxQuestionParser = require('./parser');
 const canonicalize = require('../../../../utils/canonicalize.js');
 
+function simplifyAnswers(data) {
+    const result = {};
+    for (const [key, value] of Object.entries(data)) {
+        result[key] = (value && typeof value === 'object' && value.answer !== undefined) 
+            ? value.answer 
+            : value;
+    }
+    return result;
+}
+
 class sparxMathsAutocompleter {
     constructor(sparxMaths, interaction, packageID, fakeTimeSettings, log, pdfSettings) {
         this.sparxMaths = sparxMaths;
@@ -388,7 +398,9 @@ async function sparxMathsAutocomplete(userSession) {
 
                         if (await progressUpdater.updateEmbed(`Answering Bookwork Check...`));
 
-                        const bookmarks = JSON.parse((await getBookworks(packageID)).bookworks);
+                        const rawData = JSON.parse((await getBookworks(packageID)).bookworks);
+                        const bookmarks = simplifyAnswers(rawData);
+                        log.logToFile('Bookmarks', bookmarks);
 
                         const bookmarksCorrectAnswer = await parser.parseBookworkData(bookworkInitialData.payload.wac, bookmarks);
                         if (bookmarksCorrectAnswer) { // bookmarksCorrectAnswer
