@@ -8,3 +8,4 @@ sessionLogs/**
 config.json
 apikeys.txt
 apikeys_exhausted.txt
+crash.log

@@ -1,11 +1,63 @@
 require('dotenv').config();
+const fs = require('node:fs');
+const util = require('util');
+
+if (!fs.existsSync('logs.txt')) {
+    fs.writeFileSync('logs.txt', ''); 
+}
+const logFile = fs.createWriteStream('logs.txt', { flags: 'w' });
+
+const originalLog = console.log;
+console.log = function (...args) {
+    logFile.write(util.format(...args) + '\n');
+    originalLog.apply(console, args);
+};
+
+const originalError = console.error;
+console.error = function (...args) {
+    const msg = '[ERROR] ' + util.format(...args) + '\n';
+    logFile.write(msg);
+    fs.appendFileSync('crash.log', msg); // Put fatal errors in crash.log too
+    originalError.apply(console, args);
+};
+
+process.on('uncaughtException', (err) => {
+    const errorMsg = `[Uncaught Exception] ${err ? err.stack || err : 'Unknown error'}\n`;
+    console.error(errorMsg);
+    
+    // Wrap your custom logger in a try/catch so a bug inside logError doesn't crash the bot
+    try {
+        const { logError } = require('./utils/errorLogger.js');
+        logError(err, null, 'Global Uncaught Exception');
+    } catch (e) {
+        fs.appendFileSync('crash.log', `[Meta-Error] logError function failed: ${e}\n`);
+    }
+});
+
+process.on('unhandledRejection', (reason) => {
+    const errorMsg = `[Unhandled Rejection] ${reason ? reason.stack || reason : 'Unknown reason'}\n`;
+    console.error(errorMsg);
+
+    try {
+        const { logError } = require('./utils/errorLogger.js');
+        logError(reason, null, 'Global Unhandled Rejection');
+    } catch (e) {
+        fs.appendFileSync('crash.log', `[Meta-Error] logError function failed: ${e}\n`);
+    }
+});
+
+process.on('exit', (code) => {
+    const msg = `PROCESS EXITED WITH CODE: ${code}\n`;
+    console.log(msg);
+    fs.appendFileSync('crash.log', msg);
+});
+
+
 const token = process.env.DISCORD_TOKEN;
 const ADMIN_ROLE = process.env.ADMIN_ROLE;
-const fs = require('node:fs');
 const fspromise = require('fs').promises;
 const path = require('node:path');
 const { Client, GatewayIntentBits, Collection, MessageFlags } = require('discord.js');
-const { logError } = require('./utils/errorLogger.js');
 const { executeViewAccounts, saveAccount } = require('./handlers/savedAccountsHandler.js');
 const { createAccount } = require('./handlers/accountHandler.js');
 const mainAccountLogin = require('./handlers/mainAccountLogin.js');
@@ -13,7 +65,6 @@ const { viewSavedAccounts, changeMasterPassword, updateAccountInteraction, chang
 const { handleApiKeyRequest } = require('./handlers/apikeyHandler.js');
 const config = require('./config.json');
 const imageSolverHandler = require('./imageSolver.js');
-const util = require('util');
 const getFile = require('./utils/getFile.js');
 const getParent = require('./utils/getParent.js');
 const processSettings = require('./generic/processSettings.js');
@@ -23,22 +74,6 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { colours } = require('./config.json');
 const sendStartedMessage = require('./utils/sendStartedMessage.js');
-// Ensure the file exists
-if (!fs.existsSync('logs.txt')) {
-    fs.writeFileSync('logs.txt', ''); // create an empty file
-}
-// Create a write stream to the file, 'w' = overwrite on startup
-const logFile = fs.createWriteStream('logs.txt', { flags: 'w' });
-
-const originalLog = console.log;
-
-console.log = function (...args) {
-    // Write to file
-    logFile.write(util.format(...args) + '\n');
-
-    // Also output to the console
-    originalLog.apply(console, args);
-};
 
 async function cleanAllLogs(dir = './sessionLogs') {
     const files = fs.readdirSync(dir);
@@ -87,19 +122,6 @@ async function cleanAllLogs(dir = './sessionLogs') {
 cleanAllLogs('./sessionLogs')
     .then(() => console.log('Log cleanup complete!'))
     .catch(console.error);
-
-process.on('uncaughtException', (err) => {
-    logError(err, null, 'Global Uncaught Exception');
-});
-
-process.on('unhandledRejection', (reason) => {
-    logError(reason, null, 'Global Unhandled Rejection');
-});
-
-process.on('exit', (code) => {
-    console.log(`PROCESS EXITED WITH CODE: ${code}`);
-    fs.appendFileSync('crash.log', `Exit code: ${code}\n`);
-});
 
 const { checkAccount } = require('./database/accounts.js');
 // legalDisclamer: `\n> **LEGAL DISCLAMER**: ${name} employs the use of human tutors to complete the tasks given to them by customers of ${name}. No LLM (AI) is used throughout this process. No content or material from the homework platform is used for anything other than its permitted purpose. ${name} is in compliance with all regulations and abides by all Terms of Service of this homework platform.`,
