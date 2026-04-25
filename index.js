@@ -88,22 +88,17 @@ cleanAllLogs('./sessionLogs')
     .then(() => console.log('Log cleanup complete!'))
     .catch(console.error);
 
-process.on('uncaughtException', async (err) => {
-    console.error('Uncaught Exception:', err);
-    try {
-        await logError(err, null, 'Global Uncaught Exception');
-    } catch (e) {
-        console.error('Failed to log error to DB:', e);
-    }
+process.on('uncaughtException', (err) => {
+    logError(err, null, 'Global Uncaught Exception');
 });
 
-process.on('unhandledRejection', async (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    try {
-        await logError(reason, null, 'Global Unhandled Rejection');
-    } catch (e) {
-        console.error('Failed to log error to DB:', e);
-    }
+process.on('unhandledRejection', (reason) => {
+    logError(reason, null, 'Global Unhandled Rejection');
+});
+
+process.on('exit', (code) => {
+    console.log(`PROCESS EXITED WITH CODE: ${code}`);
+    fs.appendFileSync('crash.log', `Exit code: ${code}\n`);
 });
 
 const { checkAccount } = require('./database/accounts.js');

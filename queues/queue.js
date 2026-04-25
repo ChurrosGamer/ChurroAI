@@ -13,6 +13,7 @@ for (const [index, value] of queueRanks.entries()) {
 class QueueSystem {
     constructor(queueMaxPerUse) {
         this.queueSystem = [];
+        this.farmingCancels = [];
         this.lockPerson = [];
         this.queueMaxPerUse = queueMaxPerUse;
     }
@@ -34,8 +35,9 @@ class QueueSystem {
     }
 
     async terminateSession(userID) {
-        if (this.lockPerson.some(p => p.id === userID)) {
+        if (this.lockPerson.some(p => p.id === userID)) { // There is an active session
             this.lockPerson = this.lockPerson.filter(p => p.id !== userID);
+            this.changeFarmingStatus(userID, 'blocked');
             return true;
         }
         return false;
@@ -51,6 +53,7 @@ class QueueSystem {
     }
 
     async addQueue(info) {
+        if (info.farming && this.farmingBlocked(info.id)) return 'blocked';
         let queuePosition = await this.checkQueue(info.id);
 
         if (queuePosition === -2) {
@@ -71,8 +74,6 @@ class QueueSystem {
             await info.interaction.user.send({ embeds: [responseEmbed] });
             return;
         }
-        // NEED TO MAKE IT CHECK SLOTS AND MAIN ACCOUNT
-        
 
         const rank = await this.getFirstMatchingRole(info.interaction);
         info['rank'] = rank;
@@ -94,6 +95,28 @@ class QueueSystem {
                 // Process next person if there’s still space
                 this.processQueue();
             });
+        }
+    }
+
+    async waitUntilNoUse(userId) {
+        while (await this.checkQueue(userId) !== -1) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        
+        return true; 
+    }
+
+    farmingBlocked(userId) {
+        const existingFarm = this.farmingCancels.find(item => item.userId === userId);
+        if (existingFarm?.status === 'blocked') return true;
+    }
+
+    changeFarmingStatus(userId, status) {
+        const existingFarm = this.farmingCancels.find(item => item.userId === userId);
+        if (existingFarm) {
+            existingFarm.status = status;
+        } else {
+            this.farmingCancels.push({userId, status});
         }
     }
 

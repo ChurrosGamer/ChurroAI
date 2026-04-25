@@ -26,7 +26,7 @@ class sparxReaderAutocompleter {
 
         if (first) {
             const questionObj = await this.requesticator.proceedQuestion(taskId);
-            if (questionObj === 9) {
+            if (questionObj.status === 9) {
                 // console.log("Finished questions!");
                 return;
             }
@@ -60,7 +60,7 @@ class sparxReaderAutocompleter {
 
         const questionBuffer = await this.requesticator.send(url, fullMessage);
 
-        if (questionBuffer.headers['grpc-status'] === '16') {
+        if ((questionBuffer.status === 9) || (questionBuffer.headers['grpc-status'] === '16')) {
             return;
         }
 
@@ -96,7 +96,7 @@ class sparxReaderAutocompleter {
         }
 
         const questionObj = await this.requesticator.proceedQuestion(taskId);
-        if (questionObj === 9) {
+        if (questionObj.status === 9) {
             await this.requesticator.retryQuestion(taskId);
             return {
                 experience: 0,
@@ -133,6 +133,9 @@ class sparxReaderAutocompleter {
             const aiArgs = Array.isArray(result)
                 ? [extract, questionObj.questionText, questionObj.questionOptions, result]
                 : [extract, questionObj.questionText, questionObj.questionOptions];
+
+            this.log.logToFile('AI Args', ...aiArgs);
+            this.log.logToFile('Question Options', questionObj.questionOptions);
 
             for (const apikey of apikeys) {
                 answer = await answerQuestionAi(apikey, ...aiArgs);
@@ -213,7 +216,7 @@ async function autocomplete(userSession) {
         while (!(await shouldStop())) {
             log.logToFile(`Points Accumulated: ${pointsAcquired}\nQuestions Correct: ${correctQuestions}/${totalQuestions}`);
             const taskId = await userSession.requesticator.getBookTask(bookUid);
-            if (taskId === 8) {
+            if (taskId.message === "Task Finished") {
                 finishedBook = true;
                 log.logToFile(`Book finished!`);
                 if (readUntilFinish) {

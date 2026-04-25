@@ -18,6 +18,7 @@ const isHigherModel = require('../../../../utils/isHighestModel.js');
 const makeGroupArray = require('../../../../utils/makeGroupArray.js');
 const SparxQuestionParser = require('./parser');
 const canonicalize = require('../../../../utils/canonicalize.js');
+const queue = require('./queue.js');
 
 function simplifyAnswers(data) {
     const result = {};
@@ -128,10 +129,42 @@ class sparxMathsAutocompleter {
         return await this.sparxMaths.readyQuestion(readyObj);
     }
 
+    async answerQuestionWrapper(type, answerObject, sparxMathsExecuter, question, taskIndex, index) {
+        const answerQResponse = await this.answerQuestion(answerObject, sparxMathsExecuter, question);
+        if (answerQResponse === 'expired') {
+            this.log.logToFile('Activity Expired Caught!!!!!');
+            this.log.logToFile('taskIndex', taskIndex, ';index', index);
+            let item;
+            if (type === 'bookwork') {
+                item = await this.sparxMaths.getActivity(sparxMathsExecuter.getTimestamp(), this.packageID, taskIndex, index, 1);
+            } else {
+                item = await this.sparxMaths.getActivity(sparxMathsExecuter.getTimestamp(), this.packageID, taskIndex, index);
+            }
+            const activityIndex = item.activityIndex;
+            const questionIndex = item.payload.question.questionIndex;
+            this.log.logToFile('New activity item', item);
+            this.log.logToFile('questionIndex from Item', item.payload.question.questionIndex);
+            this.log.logToFile('New activity Index', activityIndex);
+            if (type === 'bookwork') {
+                await sparxMathsExecuter.readyBookwork(activityIndex);
+            } else {
+                await sparxMathsExecuter.readyQuestion(questionIndex, activityIndex);
+            }
+            answerObject.activityIndex = activityIndex;
+            answerObject.action.question.questionIndex = questionIndex;
+            return await this.answerQuestion(answerObject, sparxMathsExecuter, question);
+        }
+        return answerQResponse;
+    }
+
     async answerQuestion(answerObject, sparxMathsExecuter, question) {
+        this.log.logToFile('Answer Object', answerObject);
         const answerResponse = await this.sparxMaths.answerQuestion(answerObject);
         this.log.logToFile('---');
         this.log.logToFile(answerResponse);
+        if (answerResponse === 'ActivityExpired') {
+            return 'expired';
+        }
         if (answerResponse.response.status === 'SUCCESS') {
             if (answerObject.action.oneofKind === 'wac') {
                 return true;
@@ -409,7 +442,7 @@ async function sparxMathsAutocomplete(userSession) {
                             await sparxMathsExecuter.readyBookwork(activityIndex);
                             log.logToFile('!!!');
                             log.logToFile(bookworkAnswer);
-                            await sparxMathsExecuter.answerQuestion(bookworkAnswer, sparxMathsExecuter);
+                            await sparxMathsExecuter.answerQuestionWrapper('bookwork', bookworkAnswer, sparxMathsExecuter, null, task.taskIndex, index);
                             return true;
                         }
 
@@ -429,7 +462,7 @@ async function sparxMathsAutocomplete(userSession) {
 
                         const bookworkAnswer = parser.parseBookwork(activityIndex, commonAnswersPrevious[0]);
                         await sparxMathsExecuter.readyBookwork(activityIndex);
-                        await sparxMathsExecuter.answerQuestion(bookworkAnswer, sparxMathsExecuter);
+                        await sparxMathsExecuter.answerQuestionWrapper('bookwork', bookworkAnswer, sparxMathsExecuter, null, task.taskIndex, index);
 
                         return true;
                     }
@@ -491,7 +524,11 @@ async function sparxMathsAutocomplete(userSession) {
 
                     let failedQuestion = null;
                     if (!questionObjectSend) {
-                        failedQuestion = await getFromDB('sparx_maths_failed', 'question', canonicalize(item.payload.question.questionSpec));
+                        try {
+                            failedQuestion = await getFromDB('sparx_maths_failed', 'question', canonicalize(item.payload.question.questionSpec));
+                        } catch {
+
+                        }
                         log.logToFile('Failed question', failedQuestion);
                         if (failedQuestion) {
                             let nextBetterModel = null;
@@ -534,7 +571,7 @@ async function sparxMathsAutocomplete(userSession) {
                         );
                     }
 
-                    const questionSuccess = await sparxMathsExecuter.answerQuestion(questionObjectSend, sparxMathsExecuter, parser.parseQuestion(questionLayout[0]));
+                    const questionSuccess = await sparxMathsExecuter.answerQuestionWrapper('question', questionObjectSend, sparxMathsExecuter, parser.parseQuestion(questionLayout[0]), task.taskIndex, index);
                     if (questionSuccess) task.numTaskItemsDone++;
                     await progressUpdater.updateProgressBar(task.taskIndex - 1, task.numTaskItemsDone, task.numTaskItems);
                     if (questionSuccess && !alreadyInDB) {
@@ -585,10 +622,12 @@ async function sparxMathsAutocomplete(userSession) {
             console.error('Failed to send feedback DM:', dmError);
         }
 
-        // Send feedback request embed if task completed successfully
+        if (progressUpdater.cancelled || errorOccured) queue.changeFarmingStatus(interaction.user.id, 'blocked');
 
         if (errorOccured) {
             await progressUpdater.updateEmbed(`An Unexpected Error has occured!`);
+        } else if (progressUpdater.cancelled) {
+            await progressUpdater.updateEmbed(`Cancelled`);
         } else {
             await progressUpdater.updateEmbed(`Finished`);
         }

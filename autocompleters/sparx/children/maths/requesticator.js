@@ -136,7 +136,7 @@ class SparxMaths extends SparxBase {
         const fullMessage = await this.encodeStuff(inputObject, 'ActivityAction');
 
         const answerRequest = await this.send('https://api.sparx-learning.com/sparx.swworker.v1.Sparxweb/ActivityAction', fullMessage); // this.authToken
-
+        if ((answerRequest.headers["grpc-status"] === '5') && (answerRequest.headers["grpc-message"] === 'ActivityNotFound')) return 'ActivityExpired';
         const answerResponse = await this.decodeStuff(answerRequest.data, 'ActivityActionResponse');
         // console.log(answerRequest.headers);
 

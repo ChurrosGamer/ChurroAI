@@ -167,8 +167,8 @@ class SparxReader extends SparxBase {
 
         // console.log("Book task calls send");
         const questionBuffer = await this.send(url, proceedMessage);
-        if (questionBuffer === 8) {
-            return 8;
+        if ((questionBuffer.status === 8) && (questionBuffer.message === 'Task Finished')) {
+            return questionBuffer;
         }
 
 
@@ -239,12 +239,13 @@ class SparxReader extends SparxBase {
             } else {
                 await this.proceedTimeout(taskId);
             }
-            return 9;
+            return { status: 9};
         }
 
         const questionFull = await this.decodeStuff(questionBuffer.data, 'SendTaskActionResponse');
         // console.log(questionFull);
- 
+
+        this.log.logToFile('Question Full', questionFull);
         if (questionFull?.task?.state?.state?.paperback?.currentQuestion) {
             const questionIdentifier = questionFull.task.state.state.paperback.currentQuestion.questionId;
             const questionText = questionFull.task.state.state.paperback.currentQuestion.questionText;

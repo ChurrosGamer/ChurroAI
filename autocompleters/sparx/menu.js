@@ -128,6 +128,83 @@ async function menu(userSession) {
                     modal.addLabelComponents(levelLabel);
                     await interaction.showModal(modal);
                 }
+            } else if (interaction.customId === 'xp_farming') {
+                await interaction.deferUpdate();
+                const curriculums = await userSession.requesticator.listCurriculumSummaries({
+                    "includeHidden": false,
+                    "subjectName": ""
+                });
+
+                const curriculumInput = new StringSelectMenuBuilder()
+                    .setCustomId('curriculum')
+                    .setPlaceholder("Curriculum");
+
+                for (const cur of curriculums.curriculumSummaries) {
+                    // console.log(cur.curriculum.displayName, cur.curriculum.name);
+                    curriculumInput.addOptions({ label: cur.curriculum.displayName, value: cur.curriculum.name });
+                }
+                const curriculum = curriculums.curriculumSummaries.find(cur => cur.curriculum.displayName === 'GCSE');
+                const curriculumId = curriculum.curriculum.name;
+
+                const topicSummariesRequest = {
+                    "topicParent": curriculumId,
+                    "options": {
+                        "includeLearningPaths": true,
+                        "omitKeyQuestions": true,
+                        "omitTopicLinks": false,
+                        "includeAllQuestions": false,
+                        "includeQuestionLayoutJson": false,
+                        "includeSkillFlagsAndTags": false
+                    }
+                };
+
+                const topicSummaries = await userSession.requesticator.listTopicSummariesRequest(topicSummariesRequest);
+                const queue = require('./children/maths/queue');
+                const autocomplete = require('./children/maths/autocomplete');
+                queue.changeFarmingStatus(interaction.user.id, 'ongoing');
+                let farmingBlocked = false;
+                for (const summary of topicSummaries.topicSummaries) {
+                    if (farmingBlocked) break;
+                    for (const learningPath of summary.learningPaths) {
+                        const specName = learningPath.specName;
+                        const learningUnitNames = learningPath.learningUnitNames;
+
+                        const packagesActive = {
+                            "curriculumName": curriculumId,
+                            "topicLevelName": specName,
+                            "objectiveNames": learningUnitNames
+                        };
+
+                        const packagesResponse = await userSession.requesticator.getPackagesIndependantLearning(packagesActive);
+                        const packageId = packagesResponse.packages[0].packageId;
+
+                        if (!packageId) {
+                            continue;
+                        }
+                        userSession.selectedHomework = packageId;
+
+                        userSession.selectRow.setDisabled(true);
+                        await userSession.updateEmbed(true);
+                        await queue.waitUntilNoUse(interaction.user.id);
+                        const returnValue = await queue.addQueue({
+                            action: async () => {
+                                return await autocompleteWrapper(
+                                    interaction, 
+                                    'sparx(maths)', 
+                                    userSession, 
+                                    () => autocomplete(userSession)
+                                );
+                            },
+                            id: interaction.user.id,
+                            interaction: interaction,
+                            farming: true
+                        });
+                        if (returnValue === 'blocked') {
+                            farmingBlocked = true;
+                            break;
+                        }
+                    }
+                }
             }
         }
     });

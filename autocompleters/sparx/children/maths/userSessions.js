@@ -84,6 +84,13 @@ class userSession {
         const minTime = new TextDisplayBuilder().setContent(`⏰ **Minimum Fake Time**: ${this.settings.min} Seconds`);
         const maxTime = new TextDisplayBuilder().setContent(`⏰ **Maximum Fake Time**: ${this.settings.max} Seconds`);
 
+        const XpFarmingButton = new ButtonBuilder()
+            .setCustomId('xp_farming')
+            .setLabel('XP Farming')
+            .setEmoji(emojis.x)
+            .setDisabled(disabled)
+            .setStyle(ButtonStyle.Primary);
+
         const IndependentLearningButton = new ButtonBuilder()
             .setCustomId('independent_learning')
             .setLabel('Independent Learning')
@@ -92,7 +99,7 @@ class userSession {
             .setStyle(ButtonStyle.Primary);
 
         const settingsRow = new ActionRowBuilder()
-            .addComponents(IndependentLearningButton);
+            .addComponents(IndependentLearningButton, XpFarmingButton);
 
         const startRow = new ActionRowBuilder();
         if (this.selectedHomework) {

@@ -33,6 +33,12 @@ class SparxBase {
             this.log.logToFile(`**Response returned**\nStatus: ${response.status}\n${JSON.stringify(response.headers, null, 2)}`);
 
             // 1. Check for standard HTTP 401 Unauthorized
+            if (response.status == 503) {
+                const err = new Error("503 Error");
+                err.response = { status: 503 };
+                throw err;
+            }
+
             if (response.status == 401) {
                 const err = new Error("Unauthorized");
                 err.response = { status: 401 };
@@ -44,25 +50,20 @@ class SparxBase {
 
             // 2. Handle gRPC Specific Statuses and Messages
             if (grpcStatus) {
-                if (grpcStatus === '8') return 8;
-                if (grpcStatus === '9' && grpcMessage === 'wrong question state for answer action') return 9;
-
-                if (['16', '9', '7'].includes(grpcStatus)) {
-                    if (grpcMessage === 'TaskItemHidden') {
-                        this.log.logToFile('Item is hidden so just break');
-                        return 'break';
+                if (grpcStatus === '8') return { status: 8, message: "Task Finished"};
+                if (grpcStatus === '9' && grpcMessage === 'wrong question state for answer action') return { status: 9, message: grpcMessage};
+                if ((grpcStatus === '7' && grpcMessage === 'permission denied') || (grpcStatus === '16' && grpcMessage === 'Bad auth info')) {
+                    const err = new Error("Unauthorized");
+                    err.response = { status: 401 };
+                    throw err;  
+                };
+                
+                if (grpcMessage?.includes('SessionInactive')) {
+                    this.log.logToFile("SESSION INACTIVE CAUGHT!");
+                    if (typeof this.getClientSession === 'function') {
+                        await this.getClientSession();
                     }
-                    if (grpcMessage?.includes('PendingWAC')) {
-                        this.log.logToFile("Bookwork check caught");
-                        return null;
-                    } 
-                    if (grpcMessage?.includes('SessionInactive')) {
-                        this.log.logToFile("SESSION INACTIVE CAUGHT!");
-                        if (typeof this.getClientSession === 'function') {
-                            await this.getClientSession();
-                        }
-                        return await this.send(url, uint8Array, attempts); 
-                    }
+                    return await this.send(url, uint8Array, attempts); 
                 }
             }
 

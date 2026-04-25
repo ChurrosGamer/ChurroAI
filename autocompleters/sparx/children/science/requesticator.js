@@ -131,7 +131,7 @@ class SparxScience extends SparxBase {
 
         const positiveNounRequest = await this.send(url, fullMessage);
 
-        if (positiveNounRequest === 9) return 9;
+        if (positiveNounRequest.status === 9) return 9;
 
         const positiveNounResponse = await this.decodeStuff(positiveNounRequest.data, 'ActivityActionResponse');
 
