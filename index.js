@@ -25,10 +25,12 @@ process.on('uncaughtException', (err) => {
     const errorMsg = `[Uncaught Exception] ${err ? err.stack || err : 'Unknown error'}\n`;
     console.error(errorMsg);
     
-    // Wrap your custom logger in a try/catch so a bug inside logError doesn't crash the bot
     try {
         const { logError } = require('./utils/errorLogger.js');
-        logError(err, null, 'Global Uncaught Exception');
+        // ADDED .catch() HERE
+        logError(err, null, 'Global Uncaught Exception').catch(e => {
+            fs.appendFileSync('crash.log', `[Meta-Error] Webhook failed: ${e.message}\n`);
+        });
     } catch (e) {
         fs.appendFileSync('crash.log', `[Meta-Error] logError function failed: ${e}\n`);
     }
@@ -40,7 +42,10 @@ process.on('unhandledRejection', (reason) => {
 
     try {
         const { logError } = require('./utils/errorLogger.js');
-        logError(reason, null, 'Global Unhandled Rejection');
+        // ADDED .catch() HERE
+        logError(reason, null, 'Global Unhandled Rejection').catch(e => {
+            fs.appendFileSync('crash.log', `[Meta-Error] Webhook failed: ${e.message}\n`);
+        });
     } catch (e) {
         fs.appendFileSync('crash.log', `[Meta-Error] logError function failed: ${e}\n`);
     }

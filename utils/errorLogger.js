@@ -44,7 +44,12 @@ async function logError(error, userId, tool, additionalInfo = '') {
 
     form.append('payload_json', JSON.stringify({ embeds: [embed] }));
 
-    await axios.post(WEBHOOK_URL, form, { headers: form.getHeaders() });
+    try {
+        await axios.post(WEBHOOK_URL, form, { headers: form.getHeaders() });
+    } catch (webhookError) {
+        // If the webhook fails, just print to console, DO NOT crash
+        console.log(`Failed to send error to Discord Webhook: ${webhookError.message}`);
+    }
 }
 
 module.exports = { logError: withRetry(logError) };
