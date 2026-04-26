@@ -13,12 +13,16 @@ console.log = function (...args) {
     originalLog.apply(console, args);
 };
 
-const originalError = console.error;
-console.error = function (...args) {
-    const msg = '[ERROR] ' + util.format(...args) + '\n';
-    logFile.write(msg);
-    fs.appendFileSync('crash.log', msg); // Put fatal errors in crash.log too
-    originalError.apply(console, args);
+const originalError = console.error; 
+console.error = function (...args) { 
+    const msg = '[ERROR] ' + util.format(...args) + '\n'; 
+    try {
+        if (logFile.writable) logFile.write(msg);
+        fs.appendFileSync('crash.log', msg); 
+    } catch (writeErr) {
+        // Silently fail if we can't write to the file, to avoid a fatal crash loop
+    }
+    originalError.apply(console, args); 
 };
 
 process.on('uncaughtException', (err) => {
