@@ -104,48 +104,71 @@ class SparxBase {
         }
     }
 
-    async _reauthenticate() {
+    async _reauthenticate(maxRetries = 3) {
+        // Outer try-finally block ensures the lock (authPromise) is ONLY cleared 
+        // after all retries are exhausted or the login is successful.
         try {
-            this.log.logToFile("Starting re-authentication process...");
-            let newAuthToken;
+            this.log.logToFile(`Starting re-authentication process (Max attempts: ${maxRetries})...`);
 
-            if (this.login?.school) {
-                const newAuthTokenN = await getTokenSparx({
-                    school: this.login.school,
-                    username: this.login.username,
-                    password: this.login.password,
-                    type: this.login.type
-                });
-                if (newAuthTokenN?.cookies) {
-                    this.cookies = newAuthTokenN.cookies;
-                }
-                if (newAuthTokenN?.authToken) {
-                    newAuthToken = newAuthTokenN.authToken;
-                }
-            } else {
-                newAuthToken = await getTokenRequest(this.cookies);
-                
-                if (newAuthToken?.includes('Unauthorized')) {
-                    const tokenFailMsg = `Failed to get a new token: The server returned Strictly Unauthorized.`;
-                    this.log.logToFile(`[FATAL] ${tokenFailMsg}`);
-                    throw new Error(tokenFailMsg); 
-                }
-            }
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    this.log.logToFile(`Login attempt ${attempt} of ${maxRetries}...`);
+                    let newAuthToken;
 
-            if (newAuthToken) {
-                this.log.logToFile('The new authtoken has been successfully acquired!');
-                this.authToken = newAuthToken;
-                this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
-                
-                if (typeof this.getClientSession === 'function') {
-                    await this.getClientSession();
+                    if (this.login?.school) {
+                        const newAuthTokenN = await getTokenSparx({
+                            school: this.login.school,
+                            username: this.login.username,
+                            password: this.login.password,
+                            type: this.login.type
+                        });
+                        if (newAuthTokenN?.cookies) {
+                            this.cookies = newAuthTokenN.cookies;
+                        }
+                        if (newAuthTokenN?.authToken) {
+                            newAuthToken = newAuthTokenN.authToken;
+                        }
+                    } else {
+                        newAuthToken = await getTokenRequest(this.cookies);
+                        
+                        if (newAuthToken?.includes('Unauthorized')) {
+                            // If the server returns "Strictly Unauthorized", it usually means 
+                            // bad credentials. You can choose to throw immediately without retrying,
+                            // or let it retry. Here it throws, allowing the catch block to retry.
+                            throw new Error(`Failed to get a new token: The server returned Strictly Unauthorized.`);
+                        }
+                    }
+
+                    if (newAuthToken) {
+                        this.log.logToFile('The new authtoken has been successfully acquired!');
+                        this.authToken = newAuthToken;
+                        this.curlRequests.headers[2] = `authorization: ${this.authToken}`;
+                        
+                        if (typeof this.getClientSession === 'function') {
+                            await this.getClientSession();
+                        }
+                        
+                        // SUCCESS: Exit the function. 
+                        // The outer finally block will still run to clear the lock.
+                        return; 
+                    } else {
+                        throw new Error("Authentication failed: No token returned");
+                    }
+
+                } catch (err) {
+                    this.log.logToFile(`[WARNING] Login attempt ${attempt} failed: ${err.message}`);
+                    
+                    // If we've reached the max retries, throw the error out completely
+                    if (attempt >= maxRetries) {
+                        const fatalMsg = `[FATAL] Exhausted all ${maxRetries} login retries. Last error: ${err.message}`;
+                        this.log.logToFile(fatalMsg);
+                        throw new Error(fatalMsg);
+                    }
                 }
-            } else {
-                this.log.logToFile('Unable to login after 401 status code');
-                throw new Error("Authentication failed: No token returned");
             }
         } finally {
-            // CRITICAL: Clear the promise lock so future 401s can trigger a new login if needed
+            // CRITICAL: Clear the promise lock so future 401s can trigger a new login if needed.
+            // Because this is outside the loop, it only clears once the whole process finishes.
             this.authPromise = null;
         }
     }
