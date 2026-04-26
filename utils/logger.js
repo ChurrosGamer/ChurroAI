@@ -39,17 +39,20 @@ class logger {
     }
 
     async send(user) {
-        await this.sendToWebhook();
-        const filePath = path.resolve(this.filepath);
-        const attachment = new AttachmentBuilder(filePath, { name: 'logs.txt' });
-        const container = new ContainerBuilder()
-            .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Session Logs!'))
-            .addFileComponents(new FileBuilder().setURL('attachment://logs.txt'));
+        try {
+            await this.sendToWebhook();
+            const filePath = path.resolve(this.filepath);
+            const attachment = new AttachmentBuilder(filePath, { name: 'logs.txt' });
+            const container = new ContainerBuilder()
+                .addTextDisplayComponents(new TextDisplayBuilder().setContent('# Session Logs!'))
+                .addFileComponents(new FileBuilder().setURL('attachment://logs.txt'));
 
-        await user.send({ files: [attachment], components: [container], flags: MessageFlags.IsComponentsV2 });
+            await user.send({ files: [attachment], components: [container], flags: MessageFlags.IsComponentsV2 });
 
-        fs.unlinkSync(filePath);
-
+            fs.unlinkSync(filePath);
+        } catch(error) {
+            console.error(`[Logger] Failed to send log to user ${user.id}:`, error.message);
+        }
     }
 
     async sendToWebhook() {
