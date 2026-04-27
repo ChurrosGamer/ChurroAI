@@ -3,6 +3,7 @@ const { MessageFlags, LabelBuilder, ActionRowBuilder, ModalBuilder, TextInputBui
 const { checkAccount } = require('../../database/accounts');
 const positiveNounChanger = require('./positiveNounChanger');
 const autocompleteWrapper = require('../../utils/autocompleteWrapper');
+const queues = require('../../queues/queues.js');
 
 async function menu(userSession) {
     
@@ -29,7 +30,7 @@ async function menu(userSession) {
                 await interaction.deferUpdate();
                 await userSession.updateEmbed(true);
                 const autocomplete = require(`./children/${userSession.platform}/autocomplete`);
-                const queueToUse = require(`./children/${userSession.platform}/queue.js`);
+                const queueToUse = queues.get(`sparx_${userSession.platform}`);
                 const platform = `sparx(${userSession.platform})`;
                 await queueToUse.addQueue({
                     action: async () => {
@@ -159,7 +160,7 @@ async function menu(userSession) {
                 };
 
                 const topicSummaries = await userSession.requesticator.listTopicSummariesRequest(topicSummariesRequest);
-                const queue = require('./children/maths/queue');
+                const queue = queues.get('sparx_maths');
                 const autocomplete = require('./children/maths/autocomplete');
                 queue.changeFarmingStatus(interaction.user.id, 'ongoing');
                 let farmingBlocked = false;

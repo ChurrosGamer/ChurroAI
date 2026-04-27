@@ -2,6 +2,7 @@ const Sparx_Requesticator = require('./requesticatorBasic.js');
 const {decode, encode} = require('./children/maths/sm_code.js');
 const getTokenSparx = require('./login.js');
 const getTokenRequest = require('./getTokenRequest.js');
+const puppetQueue = require('../../queues/puppeteerQueue.js');
 
 class SparxBase {
     /**
@@ -116,12 +117,14 @@ class SparxBase {
                     let newAuthToken;
 
                     if (this.login?.school) {
-                        const newAuthTokenN = await getTokenSparx({
-                            school: this.login.school,
-                            username: this.login.username,
-                            password: this.login.password,
-                            type: this.login.type
-                        });
+                        const newAuthTokenN = await puppetQueue.add(() =>
+                            getTokenSparx({
+                                school: this.login.school,
+                                username: this.login.username,
+                                password: this.login.password,
+                                type: this.login.type
+                            })
+                        );
                         if (newAuthTokenN?.cookies) {
                             this.cookies = newAuthTokenN.cookies;
                         }

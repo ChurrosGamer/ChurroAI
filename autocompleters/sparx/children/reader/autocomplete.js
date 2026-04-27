@@ -11,6 +11,7 @@ const { addToDb, checkAnswer } = require('../../../../database/reader.js');
 const getApiKeys = require('../../../../utils/getApiKeys.js');
 const addApiKeyExhausted = require('../../../../utils/addApiKeyExhausted.js');
 const { answerQuestionAi } = require('../../../../gemini/sparx_reader/main.js');
+const queues = require('../../../../queues/queues.js');
 
 class sparxReaderAutocompleter {
     constructor(requesticator, apikeys, log) {
@@ -176,7 +177,7 @@ async function autocomplete(userSession) {
 
     const userApiKeys = (await checkAccount(userSession.interaction.user.id)).apikeys;
     const sparxReaderExecuter = new sparxReaderAutocompleter(userSession.requesticator, userApiKeys, log);
-    const queue = require('./queue.js');
+    const queue = queues.get('sparx_reader');
     let readUntilFinish = userSession.mode === 'Read Until Book Completed';
     // let readUntilGold = userSession.mode === 'Read Until Gold Reader Acquired';
     let pointsAcquired = 0;

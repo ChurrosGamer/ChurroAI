@@ -1,6 +1,7 @@
 const getChildrenFromId = require('../../utils/getChildrenFromId.js');
 const { MessageFlags } = require('discord.js');
 const autocompleteWrapper = require('../../utils/autocompleteWrapper');
+const queues = require('../../queues/queues.js');
 
 async function modelExecutor(interaction) {
     const child = getChildrenFromId(interaction.customId)[0];
@@ -10,7 +11,7 @@ async function modelExecutor(interaction) {
         await interaction.deferUpdate();
         const userSession = userSessions.get(interaction.user.id);
         const autocomplete = require('./children/maths/autocomplete.js');
-        const queueMaths = require('./children/maths/queue.js');
+        const queueMaths = queues.get('sparx_maths');
 
         const code = interaction.fields.getTextInputValue('code');
         const curriculumId = interaction.fields.getField('curriculum').values[0];

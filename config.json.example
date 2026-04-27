@@ -1,9 +1,10 @@
 {
     "queue_size": {
-        "sparx_reader": 6,
-        "sparx_maths": 3,
-        "sparx_science": 3
+        "sparx_reader": 5,
+        "sparx_maths": 5,
+        "sparx_science": 5
     },
+    "browser_queue_size": 10,
     "slots": {
         "developer": 9999,
         "lifetime": 3,
@@ -58,12 +59,12 @@
         "explanation": "1473366371902554236",
         "tick": "1473500669997617274",
         "drfrost": "1470173968135622829",
-        "reader": "1470166339904602172",
-        "science": "1470172966905184287",
+        "sparx_reader": "1470166339904602172",
+        "sparx_science": "1470172966905184287",
         "languagenut": "1470172939780493545",
         "seneca": "1470166618423296172",
         "educake": "1470166583681749175",
-        "maths": "1470166522998554644",
+        "sparx_maths": "1470166522998554644",
         "sparx": "1470142062908411975",
         "google": "1470141847858053182",
         "microsoft": "1470141797463363645"

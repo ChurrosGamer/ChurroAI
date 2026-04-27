@@ -1,17 +1,12 @@
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MessageFlags} = require('discord.js');
 const { emojis, colours } = require('../config.json');
 const seperateParentChild = require('../utils/seperateParentChild');
+const queues = require('../queues/queues.js');
 
 async function queueCollector(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    let queueToUse;
-    const platValue = seperateParentChild(interaction.customId.split('_')[2]);
-    if (platValue.child) {
-        queueToUse = require(`../autocompleters/${platValue.parent}/children/${platValue.child}/queue.js`);
-    } else {
-        queueToUse = require(`../autocompleters/${platValue.parent}/queue.js`);
-    }
+    const queueToUse = queues.get(interaction.customId.split('_')[2]);
     const queuePeople = await queueToUse.getPeople();
     let userPosition = await queueToUse.checkQueue(interaction.user.id);
     const row = new ActionRowBuilder();

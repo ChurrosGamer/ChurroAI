@@ -5,7 +5,7 @@ const path = require('path');
  * Searches for all instances of a specific file across all folders under 'autocompleters'.
  * Returns an object where the key is the immediate parent folder name, and the value is the file path.
  * 
- * @param {string} filename - The name of the file to find (e.g., 'queue.js').
+ * @param {string} filename - The name of the file to find.
  * @returns {Object} - An object mapping folder names to absolute file paths.
  */
 function getAllFiles(filename) {

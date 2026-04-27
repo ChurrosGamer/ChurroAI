@@ -12,6 +12,7 @@ const logger = require('../../../../utils/logger.js');
 const { checkAccount } = require('../../../../database/accounts.js');
 const convertAItoObject = require('../../../../utils/convertAItoObject.js');
 const isHigherModel = require('../../../../utils/isHighestModel.js');
+const queues = require('../../../../queues/queues.js');
 
 class sparxScienceAutocompleter {
     constructor(sparxScience, interaction) {
@@ -44,7 +45,7 @@ async function sparxScienceAutocomplete(userSession) {
     log.logToFile(`**Settings**\nFaketime Min: ${settings.min}\nFaktime Max: ${settings.max}`);
     fakeTimeSetting[interaction.user.id] = { min: settings.min, max: settings.max, total: 0 };
 
-    const queueScience = require('./queue.js');
+    const queueScience = queues.get('sparx_science');
     const parser = new SparxParser(apikeys);
 
     const taskTimer = process.hrtime();

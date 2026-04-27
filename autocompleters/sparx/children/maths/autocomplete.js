@@ -18,7 +18,8 @@ const isHigherModel = require('../../../../utils/isHighestModel.js');
 const makeGroupArray = require('../../../../utils/makeGroupArray.js');
 const SparxQuestionParser = require('./parser');
 const canonicalize = require('../../../../utils/canonicalize.js');
-const queue = require('./queue.js');
+const queues = require('../../../../queues/queues.js');
+const queue = queues.get('sparx_maths');
 
 function simplifyAnswers(data) {
     const result = {};
@@ -346,7 +347,7 @@ async function sparxMathsAutocomplete(userSession) {
     sparxMaths.log = log;
     log.logToFile('Logging Start');
     log.logToFile(`**Settings**\nFaketime Min: ${settings.min}\nFaktime Max: ${settings.max}\nPDF Settings: ${JSON.stringify(settings.pdfSettings, null, 2)}`);
-    const queueMaths = require('./queue.js');
+    const queueMaths = queues.get('sparx_maths');
 
     const parser = new SparxQuestionParser(interaction, apikeys);
 
@@ -614,16 +615,7 @@ async function sparxMathsAutocomplete(userSession) {
         logError(err, null, 'Sparx Maths');
         errorOccured = true;
     } finally {
-        await log.send(interaction.user);
-
-        try {
-            await sparxMathsExecuter.sendBookWork();
-        } catch (dmError) {
-            console.error('Failed to send feedback DM:', dmError);
-        }
-
         if (progressUpdater.cancelled || errorOccured) queue.changeFarmingStatus(interaction.user.id, 'blocked');
-
         if (errorOccured) {
             await progressUpdater.updateEmbed(`An Unexpected Error has occured!`);
         } else if (progressUpdater.cancelled) {
@@ -633,6 +625,12 @@ async function sparxMathsAutocomplete(userSession) {
         }
 
         await progressUpdater.end();
+        try {
+            await sparxMathsExecuter.sendBookWork();
+        } catch (dmError) {
+            console.error('Failed to send feedback DM:', dmError);
+        }
+        await log.send(interaction.user);
     }
     return sparxMathsExecuter.totalFakeTime;
 }

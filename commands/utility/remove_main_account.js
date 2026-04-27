@@ -87,9 +87,9 @@ module.exports = {
                     .setCustomId('platform')
                     .setPlaceholder("Platform")
                     .addOptions(
-                        { label: "Reader", value: "reader", emoji: emojis.reader },
-                        { label: "Maths", value: "maths", emoji: emojis.maths },
-                        { label: "Science", value: "science", emoji: emojis.science },
+                        { label: "Reader", value: "reader", emoji: emojis.sparx_reader },
+                        { label: "Maths", value: "maths", emoji: emojis.sparx_maths },
+                        { label: "Science", value: "science", emoji: emojis.sparx_science },
                         { label: "LanguageNut", value: "languagenut", emoji: emojis.languagenut },
                         { label: "Educake", value: "educake", emoji: emojis.educake },
                         { label: "Seneca", value: "seneca", emoji: emojis.seneca },

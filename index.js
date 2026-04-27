@@ -61,7 +61,8 @@ process.on('exit', (code) => {
     fs.appendFileSync('crash.log', msg);
 });
 
-
+const Queues = require('./queues/queues.js');
+const { handleQueueInput } = require('./handlers/queueChangeHandler.js');
 const token = process.env.DISCORD_TOKEN;
 const ADMIN_ROLE = process.env.ADMIN_ROLE;
 const fspromise = require('fs').promises;
@@ -332,6 +333,11 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (interaction.customId.endsWith('_settings')) {
             await processSettings(interaction);
+            return;
+        }
+
+        if (interaction.customId.startsWith('queues_')) {
+            await handleQueueInput(interaction);
             return;
         }
 
