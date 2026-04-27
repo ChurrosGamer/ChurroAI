@@ -3,10 +3,16 @@ const { emojis, colours } = require('../config.json');
 const seperateParentChild = require('../utils/seperateParentChild');
 const queues = require('../queues/queues.js');
 
+function toSnakeCase(str) {
+  return str
+    .replace(/\((.*?)\)/, '_$1') // replace (science) with _science
+    .toLowerCase();
+}
+
 async function queueCollector(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const queueToUse = queues.get(interaction.customId.split('_')[2]);
+    const queueToUse = queues.get(toSnakeCase(interaction.customId.split('_')[2]));
     const queuePeople = await queueToUse.getPeople();
     let userPosition = await queueToUse.checkQueue(interaction.user.id);
     const row = new ActionRowBuilder();
