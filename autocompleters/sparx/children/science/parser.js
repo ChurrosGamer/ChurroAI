@@ -1,7 +1,6 @@
 const getApiKeys = require('../../../../utils/getApiKeys.js');
 const removeDuplicates = require('../../../../utils/removeDuplicates.js');
-const addApiKeyExhausted = require('../../../../utils/addApiKeyExhausted.js');
-const { GoogleGenAI } = require("@google/genai");
+const useApiKeys = require('../../../../utils/useApiKeys.js');
 
 class SparxParser {
 
@@ -272,19 +271,9 @@ class SparxParser {
     async parse(data, model, activityName, token, supportMaterial, incorrect_answers) {
         const parsedData = this.parseQuestion(data);
 
-        const { geminiAnswer, geminiAnswers } = require('../../../../gemini/sparx_maths/main');
+        const { geminiAnswer } = require('../../../../gemini/sparx_maths/main');
         const apikeys = removeDuplicates([...this.apiKeys, ...(await getApiKeys())]);
-        let aiAnswered;
-        for (const apikey of apikeys) {
-            let gemAns = geminiAnswer;
-            const newClass = new geminiAnswers();
-            newClass.ai = new GoogleGenAI({ apiKey: apikey });
-            gemAns = newClass;
-            aiAnswered = await gemAns.answerQuestion(parsedData, model, incorrect_answers, "science", supportMaterial);
-
-            if (aiAnswered === 429) await addApiKeyExhausted(apikey);
-            if (typeof aiAnswered !== 'number') break;
-        }
+        const aiAnswered = await useApiKeys(apikeys, geminiAnswer.answerQuestion, [parsedData, model, incorrect_answers, "science", supportMaterial]);
 
         const answerObject = this.getQuestionObject(aiAnswered, activityName, token);
 

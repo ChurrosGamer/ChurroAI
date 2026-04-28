@@ -59,7 +59,7 @@ async function answerQuestionAi(apiKey, extract, question, questionOptions, inco
 
   } catch(err) {
 
-    const handlableErrorCodes = [503, 429];
+    const handlableErrorCodes = [503, 429, 400];
     let parsed = err;
 
     // If it's an Error object with JSON in .message

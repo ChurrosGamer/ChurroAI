@@ -1,6 +1,5 @@
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MessageFlags} = require('discord.js');
 const { emojis, colours } = require('../config.json');
-const seperateParentChild = require('../utils/seperateParentChild');
 const queues = require('../queues/queues.js');
 
 function toSnakeCase(str) {

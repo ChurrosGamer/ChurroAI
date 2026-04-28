@@ -9,9 +9,9 @@ const logger = require('../../../../utils/logger.js');
 const { colours } = require('../../../../config.json');
 const { addToDb, checkAnswer } = require('../../../../database/reader.js');
 const getApiKeys = require('../../../../utils/getApiKeys.js');
-const addApiKeyExhausted = require('../../../../utils/addApiKeyExhausted.js');
 const { answerQuestionAi } = require('../../../../gemini/sparx_reader/main.js');
 const queues = require('../../../../queues/queues.js');
+const useApiKeys = require('../../../../utils/useApiKeys.js');
 
 class sparxReaderAutocompleter {
     constructor(requesticator, apikeys, log) {
@@ -129,7 +129,6 @@ class sparxReaderAutocompleter {
         if (typeof(result) === "string") {
             return result;
         } else {
-            let answer;
 
             const aiArgs = Array.isArray(result)
                 ? [extract, questionObj.questionText, questionObj.questionOptions, result]
@@ -138,11 +137,7 @@ class sparxReaderAutocompleter {
             this.log.logToFile('AI Args', ...aiArgs);
             this.log.logToFile('Question Options', questionObj.questionOptions);
 
-            for (const apikey of apikeys) {
-                answer = await answerQuestionAi(apikey, ...aiArgs);
-                if (answer === 429) await addApiKeyExhausted(apikey);
-                if (typeof answer !== 'number') break;
-            }
+            const answer = await useApiKeys(apikeys, answerQuestionAi, aiArgs); 
 
             return answer;
         }

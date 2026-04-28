@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Type } = require("@google/genai");
 const Image_Requesticator = require('./requesticator');
+const { GoogleGenAI } = require("@google/genai");
 
 function isUUID(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -9,12 +10,13 @@ function isUUID(str) {
 
 class geminiAnswers {
     constructor() {
-        this.ai = null;
         this.requesticator = new Image_Requesticator();
+        this.answerQuestion = this.answerQuestion.bind(this);
     }
 
-    async answerQuestion(questionObj, model, incorrect_answers, sparx="maths", supportMaterial) {
+    async answerQuestion(apikey, questionObj, model, incorrect_answers, sparx="maths", supportMaterial) {
 
+        const ai = new GoogleGenAI({ apiKey: apikey });
         try {
 
         const contents = [];
@@ -150,7 +152,7 @@ class geminiAnswers {
             systemInstruction += ' DO NOT USE LATEX FOR YOUR ANSWER';
         }
 
-        let response = await this.ai.models.generateContent({
+        let response = await ai.models.generateContent({
             model: `gemini-${model}`,
             contents: contents,
             config: {
@@ -218,7 +220,7 @@ class geminiAnswers {
         return answerObj;
 
         } catch(err) {
-            const handlableErrorCodes = [503, 429];
+            const handlableErrorCodes = [503, 429, 400];
             let parsed = err;
 
             // If it's an Error object with JSON in .message

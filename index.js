@@ -19,7 +19,7 @@ console.error = function (...args) {
     try {
         if (logFile.writable) logFile.write(msg);
         fs.appendFileSync('crash.log', msg); 
-    } catch (writeErr) {
+    } catch {
         // Silently fail if we can't write to the file, to avoid a fatal crash loop
     }
     originalError.apply(console, args); 
@@ -61,7 +61,6 @@ process.on('exit', (code) => {
     fs.appendFileSync('crash.log', msg);
 });
 
-const Queues = require('./queues/queues.js');
 const { handleQueueInput } = require('./handlers/queueChangeHandler.js');
 const token = process.env.DISCORD_TOKEN;
 const ADMIN_ROLE = process.env.ADMIN_ROLE;

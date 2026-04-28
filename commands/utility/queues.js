@@ -2,7 +2,6 @@ const { SlashCommandBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, Co
 const { colours, emojis } = require('../../config.json');
 const formatSubject = require('../../utils/formatSubject');
 const seperateIntoRows = require('../../utils/seperateIntoRows');
-const collector = require('../../generic/startEmbedCollector');
 const allQueues = require('../../queues/queues');
 const puppetQueue = require('../../queues/puppeteerQueue');
 
@@ -10,7 +9,7 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('queues')
 		.setDescription('Gets information on all of the queues'),
-	async execute(interaction, client) {
+	async execute(interaction) {
         const container = new ContainerBuilder()
             .setAccentColor(colours.onyx);
 
